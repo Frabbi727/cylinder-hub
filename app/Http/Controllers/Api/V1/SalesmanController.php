@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\StoreAllocationRequest;
+use App\Http\Requests\Api\StoreSalesmanRequest;
 use App\Models\User;
 use App\Models\StockAllocation;
 use App\Repositories\Contracts\SaleRepositoryInterface;
 use App\Services\AllocationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 
 class SalesmanController extends Controller
 {
@@ -18,14 +20,17 @@ class SalesmanController extends Controller
         private SaleRepositoryInterface $saleRepository,
     ) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $salesmen = User::where('role', 'salesman')
-            ->where('is_active', true)
-            ->with(['allocations' => fn ($q) => $q->today()->with('cylinder')])
-            ->get();
+        $query = User::where('role', 'salesman')
+            ->with(['allocations' => fn ($q) => $q->today()->with('cylinder')]);
 
-        return response()->json($salesmen);
+        // Optionally filter to active only (salesman mobile app uses ?active=1)
+        if ($request->boolean('active')) {
+            $query->where('is_active', true);
+        }
+
+        return response()->json($query->orderBy('name')->get());
     }
 
     public function show(User $user): JsonResponse
@@ -41,11 +46,11 @@ class SalesmanController extends Controller
         ]);
     }
 
-    public function allocate(StoreAllocationRequest $request, User $salesman): JsonResponse
+    public function allocate(StoreAllocationRequest $request, User $user): JsonResponse
     {
         $data = $request->validated();
         $allocation = $this->allocationService->allocate(
-            $salesman->id,
+            $user->id,
             $data['cylinder_id'],
             $data['qty'],
             $data['allocation_date'] ?? today()->toDateString()
@@ -70,5 +75,64 @@ class SalesmanController extends Controller
         );
 
         return response()->json($allocation);
+    }
+
+    // ---- Salesman management (admin only) ----
+
+    public function store(StoreSalesmanRequest $request): JsonResponse
+    {
+        $data = $request->validated();
+        $initials = collect(explode(' ', trim($data['name'])))
+            ->map(fn ($w) => strtoupper($w[0]))
+            ->take(2)
+            ->implode('');
+
+        $salesman = User::create([
+            'name'            => $data['name'],
+            'email'           => $data['email'],
+            'password'        => Hash::make($data['password']),
+            'phone'           => $data['phone'] ?? null,
+            'role'            => 'salesman',
+            'avatar_initials' => $initials,
+            'is_active'       => true,
+        ]);
+
+        return response()->json($salesman, 201);
+    }
+
+    public function update(StoreSalesmanRequest $request, User $user): JsonResponse
+    {
+        $data = $request->validated();
+
+        $updates = array_filter([
+            'name'  => $data['name']  ?? null,
+            'phone' => $data['phone'] ?? null,
+            'email' => $data['email'] ?? null,
+        ]);
+
+        if (!empty($data['password'])) {
+            $updates['password'] = Hash::make($data['password']);
+        }
+
+        // Regenerate initials if name changed
+        if (!empty($data['name'])) {
+            $updates['avatar_initials'] = collect(explode(' ', trim($data['name'])))
+                ->map(fn ($w) => strtoupper($w[0]))
+                ->take(2)
+                ->implode('');
+        }
+
+        $user->update($updates);
+        return response()->json($user->fresh());
+    }
+
+    public function toggleActive(User $user): JsonResponse
+    {
+        $user->update(['is_active' => ! $user->is_active]);
+        return response()->json([
+            'id'        => $user->id,
+            'is_active' => $user->is_active,
+            'message'   => $user->is_active ? 'Salesman activated.' : 'Salesman deactivated.',
+        ]);
     }
 }

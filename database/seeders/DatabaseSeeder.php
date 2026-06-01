@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
             CylinderSeeder::class,
             SupplierSeeder::class,
             CustomerSeeder::class,
+            SampleDataSeeder::class,
         ]);
     }
 }

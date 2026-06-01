@@ -52,7 +52,7 @@ Route::prefix('v1')->group(function () {
         Route::get('suppliers/{supplier}',  [SupplierController::class, 'show']);
         Route::post('suppliers/{supplier}/pay', [SupplierController::class, 'pay']);
 
-        // Salesmen
+        // Salesmen — read & allocate (authenticated)
         Route::get('salesmen',                                  [SalesmanController::class, 'index']);
         Route::get('salesmen/{user}',                           [SalesmanController::class, 'show']);
         Route::post('salesmen/{user}/allocate',                 [SalesmanController::class, 'allocate']);
@@ -86,6 +86,11 @@ Route::prefix('v1')->group(function () {
             Route::delete('suppliers/{supplier}', [SupplierController::class, 'destroy']);
 
             Route::delete('expenses/{expense}', [ExpenseController::class, 'destroy']);
+
+            // Salesman management (admin only)
+            Route::post('salesmen',                              [SalesmanController::class, 'store']);
+            Route::put('salesmen/{user}',                        [SalesmanController::class, 'update']);
+            Route::post('salesmen/{user}/toggle-active',         [SalesmanController::class, 'toggleActive']);
         });
     });
 });

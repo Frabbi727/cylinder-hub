@@ -6,6 +6,7 @@ use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\Customer;
 use App\Models\PurchaseItem;
+use App\Models\StockAllocation;
 use Illuminate\Support\Facades\DB;
 
 class SaleService
@@ -53,9 +54,18 @@ class SaleService
                 'notes'        => $data['notes'] ?? null,
             ]);
 
+            // Only persist DB columns — strip display-only fields like lot_id_label
+            $dbFields = ['purchase_item_id', 'cylinder_id', 'qty', 'unit_price', 'unit_cost', 'profit'];
             foreach ($allSaleItems as $saleItemData) {
-                SaleItem::create(array_merge($saleItemData, ['sale_id' => $sale->id]));
+                SaleItem::create(array_merge(
+                    array_intersect_key($saleItemData, array_flip($dbFields)),
+                    ['sale_id' => $sale->id]
+                ));
             }
+
+            // Reflect this sale's qty on the salesman's open allocation so
+            // the allocation card shows real-time "sold" numbers without waiting for reconcile
+            $this->updateAllocationSoldQty($data['salesman_id'], $data['items'], $data['sale_date']);
 
             // Update customer's total due if it's a due/partial sale
             if ($sale->customer_id && $paidAmount < $totalAmount) {
@@ -65,6 +75,35 @@ class SaleService
 
             return $sale->load(['items.cylinder', 'customer', 'salesman']);
         });
+    }
+
+    /**
+     * Find the salesman's open (unreconciled) allocation for each item's cylinder
+     * on the sale date and increment sold_qty. Handles the case where the salesman
+     * received multiple allocations for the same cylinder on the same day.
+     */
+    private function updateAllocationSoldQty(int $salesmanId, array $items, string $saleDate): void
+    {
+        // Group items by cylinder_id so we make one update per cylinder
+        $qtyByCylinder = [];
+        foreach ($items as $item) {
+            $cid = (int) $item['cylinder_id'];
+            $qtyByCylinder[$cid] = ($qtyByCylinder[$cid] ?? 0) + (int) $item['qty'];
+        }
+
+        foreach ($qtyByCylinder as $cylinderId => $qty) {
+            // Find the oldest unreconciled allocation for this salesman+cylinder+date
+            $allocation = StockAllocation::where('salesman_id', $salesmanId)
+                ->where('cylinder_id', $cylinderId)
+                ->whereDate('allocation_date', $saleDate)
+                ->where('is_reconciled', false)
+                ->orderBy('created_at', 'asc')
+                ->first();
+
+            if ($allocation) {
+                $allocation->increment('sold_qty', $qty);
+            }
+        }
     }
 
     /**
@@ -89,6 +128,22 @@ class SaleService
 
                 // Restore filled stock
                 $this->stockService->addFilledStock($saleItem->cylinder_id, $saleItem->qty);
+            }
+
+            // Reverse sold_qty on the allocation
+            $qtyByCylinder = [];
+            foreach ($sale->items as $saleItem) {
+                $cid = $saleItem->cylinder_id;
+                $qtyByCylinder[$cid] = ($qtyByCylinder[$cid] ?? 0) + $saleItem->qty;
+            }
+            foreach ($qtyByCylinder as $cylinderId => $qty) {
+                StockAllocation::where('salesman_id', $sale->salesman_id)
+                    ->where('cylinder_id', $cylinderId)
+                    ->whereDate('allocation_date', $sale->sale_date)
+                    ->where('is_reconciled', false)
+                    ->orderBy('created_at', 'asc')
+                    ->first()
+                    ?->decrement('sold_qty', $qty);
             }
 
             // Reverse customer due if applicable
