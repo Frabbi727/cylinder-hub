@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
 import Router from './router/index';
+import './i18n'; // initialize i18next before rendering
 import '../css/app.css';
 
 const queryClient = new QueryClient({

@@ -1,22 +1,31 @@
 import React from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { Calendar, Bell, Plus } from 'lucide-react';
-
-const PAGE_META = {
-  '/':           ['Dashboard',       `Today · ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}`],
-  '/inventory':  ['Inventory & Stock','Cylinder types · filled & empty tracking'],
-  '/purchases':  ['Purchases & Lots', 'FIFO lot queue & profit'],
-  '/sales':      ['Sales',            'Record and track sales'],
-  '/allocation': ['Salesman Stock',   'Allocate & reconcile daily'],
-  '/customers':  ['Customers',        'Customer accounts & collections'],
-  '/suppliers':  ['Suppliers',        'Supplier accounts & payments'],
-  '/expenses':   ['Expenses',         'Track business expenses'],
-};
+import { useTranslation } from 'react-i18next';
+import i18n from '../../i18n';
 
 export default function Topbar({ onQuickSale }) {
-  const location = useLocation();
-  const path     = location.pathname;
+  const location  = useLocation();
+  const { t }     = useTranslation();
+  const path      = location.pathname;
+
+  const PAGE_META = {
+    '/':           [t('nav.dashboard'),   `${t('common.today')} · ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}`],
+    '/inventory':  [t('nav.inventory'),   t('inventory.stockOverview') + ' · ' + t('inventory.cylinderTypes')],
+    '/purchases':  [t('nav.purchases'),   t('purchases.subtitle')],
+    '/sales':      [t('nav.sales'),       t('sales.noSales').split('.')[0]],
+    '/allocation': [t('nav.allocation'),  t('allocation.allocatedToday') + ' · ' + t('allocation.reconcile')],
+    '/customers':  [t('nav.customers'),   t('customers.totalDue')],
+    '/suppliers':  [t('nav.suppliers'),   t('suppliers.totalDue')],
+    '/expenses':   [t('nav.expenses'),    t('expenses.thisMonthExpenses')],
+  };
   const [title, subtitle] = PAGE_META[path] || ['CylinderHub', ''];
+
+  const toggleLang = () => {
+    const next = i18n.language === 'en' ? 'bn' : 'en';
+    i18n.changeLanguage(next);
+    localStorage.setItem('cylinderhub_lang', next);
+  };
 
   return (
     <header className="topbar">
@@ -29,9 +38,12 @@ export default function Topbar({ onQuickSale }) {
           <Calendar size={14} />
           {new Date().toLocaleDateString('en-US',{weekday:'short', month:'short', day:'numeric'})}
         </div>
-        <button className="icon-btn" title="Notifications"><Bell size={18} /></button>
+        <button className="btn btn-ghost btn-sm" onClick={toggleLang} title="Switch Language" style={{ fontSize: 13, gap: 4 }}>
+          {i18n.language === 'en' ? '🇧🇩 বাংলা' : '🇬🇧 English'}
+        </button>
+        <button className="icon-btn" title={t('common.close')}><Bell size={18} /></button>
         <button className="btn btn-primary btn-sm" onClick={onQuickSale}>
-          <Plus size={16} /> Quick Sale
+          <Plus size={16} /> {t('sales.quickSale')}
         </button>
       </div>
     </header>

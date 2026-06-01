@@ -8,16 +8,17 @@ class StockAllocation extends Model
 {
     protected $fillable = [
         'salesman_id', 'cylinder_id', 'allocation_date',
-        'qty', 'sold_qty', 'returned_qty', 'collected_amount',
+        'qty', 'sale_price', 'sold_qty', 'returned_qty', 'collected_amount',
         'is_reconciled', 'notes',
     ];
 
     protected function casts(): array
     {
         return [
-            'allocation_date' => 'date',
+            'allocation_date'  => 'date:Y-m-d',
+            'sale_price'       => 'decimal:2',
             'collected_amount' => 'decimal:2',
-            'is_reconciled' => 'boolean',
+            'is_reconciled'    => 'boolean',
         ];
     }
 

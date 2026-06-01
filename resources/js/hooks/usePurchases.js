@@ -6,7 +6,8 @@ import { useState } from 'react';
 
 export function usePurchases() {
   const qc = useQueryClient();
-  const [showAdd, setShowAdd] = useState(false);
+  const [showAdd,   setShowAdd]   = useState(false);
+  const [payTarget, setPayTarget] = useState(null); // purchase to pay balance on
   const [simulation, setSimulation] = useState(null);
   const [simLoading, setSimLoading] = useState(false);
 
@@ -35,6 +36,16 @@ export function usePurchases() {
     },
   });
 
+  const payMutation = useMutation({
+    mutationFn: ({ id, data }) => purchaseService.payBalance(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['purchases'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+      qc.invalidateQueries({ queryKey: ['suppliers'] });
+      setPayTarget(null);
+    },
+  });
+
   const simulateSale = async (cylinderId, qty, unitPrice) => {
     setSimLoading(true);
     setSimulation(null);
@@ -46,20 +57,20 @@ export function usePurchases() {
     }
   };
 
-  const purchaseList = purchases?.data || [];
-  const cylinderList = Array.isArray(cylinders) ? cylinders : (cylinders?.data || []);
-  const supplierList = suppliers?.data || [];
-
   return {
-    purchases: purchaseList,
-    meta: purchases?.meta,
+    purchases: purchases?.data || [],
+    meta:      purchases?.meta,
     isLoading,
-    cylinders: cylinderList,
-    suppliers: supplierList,
+    cylinders: Array.isArray(cylinders) ? cylinders : (cylinders?.data || []),
+    suppliers: suppliers?.data || [],
     showAdd, setShowAdd,
+    payTarget, setPayTarget,
     createPurchase: createMutation.mutate,
-    isCreating: createMutation.isPending,
-    createError: createMutation.error,
+    isCreating:     createMutation.isPending,
+    createError:    createMutation.error,
+    payBalance:     payMutation.mutate,
+    isPaying:       payMutation.isPending,
+    payError:       payMutation.error,
     simulation, simulateSale, simLoading,
   };
 }

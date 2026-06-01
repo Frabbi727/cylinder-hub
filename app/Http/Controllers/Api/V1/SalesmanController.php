@@ -22,8 +22,10 @@ class SalesmanController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $date = $request->get('date', today()->toDateString());
+
         $query = User::where('role', 'salesman')
-            ->with(['allocations' => fn ($q) => $q->today()->with('cylinder')]);
+            ->with(['allocations' => fn ($q) => $q->whereDate('allocation_date', $date)->with('cylinder')]);
 
         // Optionally filter to active only (salesman mobile app uses ?active=1)
         if ($request->boolean('active')) {
@@ -35,6 +37,11 @@ class SalesmanController extends Controller
 
     public function show(User $user): JsonResponse
     {
+        // A salesman can only view their own data
+        if (auth()->user()->isSalesman() && $user->id !== auth()->id()) {
+            abort(403, 'Access denied.');
+        }
+
         $user->load([
             'allocations' => fn ($q) => $q->today()->with('cylinder'),
         ]);
@@ -53,6 +60,7 @@ class SalesmanController extends Controller
             $user->id,
             $data['cylinder_id'],
             $data['qty'],
+            (float) $data['sale_price'],
             $data['allocation_date'] ?? today()->toDateString()
         );
 
@@ -61,11 +69,19 @@ class SalesmanController extends Controller
 
     public function reconcile(Request $request, StockAllocation $allocation): JsonResponse
     {
+        if ($allocation->is_reconciled) {
+            abort(422, 'This allocation has already been reconciled.');
+        }
+
         $data = $request->validate([
             'sold_qty'         => 'required|integer|min:0',
             'returned_qty'     => 'required|integer|min:0',
             'collected_amount' => 'required|numeric|min:0',
         ]);
+
+        if ($data['sold_qty'] + $data['returned_qty'] > $allocation->qty) {
+            abort(422, 'Sold ('.$data['sold_qty'].') + returned ('.$data['returned_qty'].') cannot exceed allocated quantity ('.$allocation->qty.').');
+        }
 
         $allocation = $this->allocationService->reconcile(
             $allocation,

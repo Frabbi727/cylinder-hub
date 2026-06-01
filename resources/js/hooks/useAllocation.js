@@ -3,32 +3,42 @@ import { salesmanService } from '../services/salesmanService';
 import { cylinderService } from '../services/cylinderService';
 import { useState } from 'react';
 
-const ALLOC_FORM_DEFAULT = { cylinder_id: '', qty: 1 };
+const todayStr = new Date().toISOString().split('T')[0];
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split('T')[0];
+}
+
+const ALLOC_FORM_DEFAULT   = { cylinder_id: '', qty: 1, sale_price: '' };
 const SALESMAN_FORM_DEFAULT = { name: '', email: '', password: '', phone: '' };
 const RECONCILE_FORM_DEFAULT = { sold_qty: 0, returned_qty: 0, collected_amount: '' };
 
 export function useAllocation() {
   const qc = useQueryClient();
 
-  // Modal open states
-  const [showAllocate,   setShowAllocate]   = useState(false);
-  const [showAddSalesman,setShowAddSalesman] = useState(false);
-  const [showEditSalesman,setShowEditSalesman] = useState(false);
-  const [showReconcile,  setShowReconcile]  = useState(false);
+  const [viewDate, setViewDate] = useState(todayStr);
+  const isToday = viewDate === todayStr;
 
-  // Currently selected items
+  const prevDay = () => setViewDate(d => addDays(d, -1));
+  const nextDay = () => !isToday && setViewDate(d => addDays(d, 1));
+
+  const [showAllocate,    setShowAllocate]    = useState(false);
+  const [showAddSalesman, setShowAddSalesman] = useState(false);
+  const [showEditSalesman,setShowEditSalesman]= useState(false);
+  const [showReconcile,   setShowReconcile]   = useState(false);
+
   const [selectedSalesman,   setSelectedSalesman]   = useState(null);
   const [selectedAllocation, setSelectedAllocation] = useState(null);
 
-  // Form states
-  const [allocForm,    setAllocForm]    = useState(ALLOC_FORM_DEFAULT);
-  const [salesmanForm, setSalesmanForm] = useState(SALESMAN_FORM_DEFAULT);
-  const [reconcileForm,setReconcileForm]= useState(RECONCILE_FORM_DEFAULT);
+  const [allocForm,     setAllocForm]     = useState(ALLOC_FORM_DEFAULT);
+  const [salesmanForm,  setSalesmanForm]  = useState(SALESMAN_FORM_DEFAULT);
+  const [reconcileForm, setReconcileForm] = useState(RECONCILE_FORM_DEFAULT);
 
-  // ---- Queries ----
   const { data: salesmen, isLoading } = useQuery({
-    queryKey: ['salesmen'],
-    queryFn:  salesmanService.getAll,
+    queryKey: ['salesmen', viewDate],
+    queryFn:  () => salesmanService.getAll(viewDate),
     refetchInterval: 30_000,
   });
 
@@ -37,9 +47,12 @@ export function useAllocation() {
     queryFn:  cylinderService.getAll,
   });
 
-  // ---- Mutations ----
   const allocateMutation = useMutation({
-    mutationFn: ({ salesmanId, data }) => salesmanService.allocate(salesmanId, data),
+    mutationFn: ({ salesmanId, data }) => salesmanService.allocate(salesmanId, {
+      cylinder_id: parseInt(data.cylinder_id),
+      qty:         parseInt(data.qty),
+      sale_price:  parseFloat(data.sale_price || 0),
+    }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['salesmen'] });
       qc.invalidateQueries({ queryKey: ['stock'] });
@@ -83,7 +96,6 @@ export function useAllocation() {
     },
   });
 
-  // ---- Action helpers ----
   const openAllocate = (salesman) => {
     setSelectedSalesman(salesman);
     setAllocForm(ALLOC_FORM_DEFAULT);
@@ -111,37 +123,27 @@ export function useAllocation() {
   };
 
   return {
-    // Data
     salesmen:   Array.isArray(salesmen) ? salesmen : [],
     cylinders:  Array.isArray(cylinders) ? cylinders : (cylinders?.data || []),
     isLoading,
-
-    // Allocate
+    viewDate, setViewDate, isToday, prevDay, nextDay,
     showAllocate, setShowAllocate,
     allocForm,    setAllocForm,
     selectedSalesman, openAllocate,
     allocate:     allocateMutation.mutate,
     isAllocating: allocateMutation.isPending,
     allocateError:allocateMutation.error,
-
-    // Add salesman
     showAddSalesman, setShowAddSalesman,
     salesmanForm, setSalesmanForm,
     createSalesman: createSalesmanMutation.mutate,
     isCreatingSalesman: createSalesmanMutation.isPending,
     createSalesmanError: createSalesmanMutation.error,
-
-    // Edit salesman
     showEditSalesman, setShowEditSalesman,
     openEditSalesman,
     updateSalesman: updateSalesmanMutation.mutate,
     isUpdatingSalesman: updateSalesmanMutation.isPending,
     updateSalesmanError: updateSalesmanMutation.error,
-
-    // Toggle active
     toggleActive: toggleActiveMutation.mutate,
-
-    // Reconcile
     showReconcile, setShowReconcile,
     selectedAllocation,
     reconcileForm, setReconcileForm,

@@ -3,17 +3,23 @@
 namespace App\Repositories\Eloquent;
 
 use App\Models\Sale;
+use App\Models\User;
 use App\Repositories\Contracts\SaleRepositoryInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class SaleRepository implements SaleRepositoryInterface
 {
-    public function paginate(int $perPage = 15): LengthAwarePaginator
+    public function paginate(int $perPage = 15, ?User $user = null): LengthAwarePaginator
     {
-        return Sale::with(['customer', 'salesman', 'items.cylinder'])
-            ->orderByDesc('sale_date')
-            ->paginate($perPage);
+        $query = Sale::with(['customer', 'salesman', 'items.cylinder'])
+            ->orderByDesc('sale_date');
+
+        if ($user?->isSalesman()) {
+            $query->where('salesman_id', $user->id);
+        }
+
+        return $query->paginate($perPage);
     }
 
     public function findById(int $id): ?Sale

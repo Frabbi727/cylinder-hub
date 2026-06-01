@@ -1,6 +1,6 @@
 import api from './api';
 export const salesmanService = {
-  getAll:       ()               => api.get('/salesmen').then(r => r.data),
+  getAll:       (date)           => api.get('/salesmen', { params: date ? { date } : {} }).then(r => r.data),
   getById:      (id)             => api.get(`/salesmen/${id}`).then(r => r.data),
   create:       (data)           => api.post('/salesmen', data).then(r => r.data),
   update:       (id, data)       => api.put(`/salesmen/${id}`, data).then(r => r.data),

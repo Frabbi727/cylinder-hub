@@ -18,6 +18,13 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+function AdminRoute({ children }) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== 'admin') return <Navigate to="/sales" replace />;
+  return children;
+}
+
 export default function Router() {
   return (
     <BrowserRouter>
@@ -27,14 +34,14 @@ export default function Router() {
           <ProtectedRoute>
             <AppShell>
               <Routes>
-                <Route index element={<Dashboard />} />
-                <Route path="inventory" element={<Inventory />} />
-                <Route path="purchases" element={<Purchases />} />
-                <Route path="sales" element={<Sales />} />
-                <Route path="allocation" element={<Allocation />} />
-                <Route path="customers" element={<Customers />} />
-                <Route path="suppliers" element={<Suppliers />} />
-                <Route path="expenses" element={<Expenses />} />
+                <Route index element={<AdminRoute><Dashboard /></AdminRoute>} />
+                <Route path="inventory"  element={<AdminRoute><Inventory /></AdminRoute>} />
+                <Route path="purchases"  element={<AdminRoute><Purchases /></AdminRoute>} />
+                <Route path="sales"      element={<Sales />} />
+                <Route path="allocation" element={<AdminRoute><Allocation /></AdminRoute>} />
+                <Route path="customers"  element={<AdminRoute><Customers /></AdminRoute>} />
+                <Route path="suppliers"  element={<AdminRoute><Suppliers /></AdminRoute>} />
+                <Route path="expenses"   element={<AdminRoute><Expenses /></AdminRoute>} />
               </Routes>
             </AppShell>
           </ProtectedRoute>

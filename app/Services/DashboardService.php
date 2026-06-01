@@ -13,47 +13,35 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardService
 {
-    public function getTodaySummary(): array
+    public function getSummary(string $from, string $to): array
     {
-        $todaySales = Sale::today()->get();
-        $todayItems = SaleItem::whereHas('sale', fn ($q) => $q->today())->get();
-
-        $totalSalesAmount = $todaySales->sum('total_amount');
-        $totalProfit      = $todayItems->sum('profit');
-        $totalFilledStock = CylinderStock::sum('filled_qty');
-        $totalCustomerDue = Customer::sum('total_due');
-        $totalSupplierDue = Supplier::sum('total_due');
-        $monthlyExpenses  = Expense::thisMonth()->sum('amount');
+        $sales = Sale::whereBetween('sale_date', [$from, $to])->get();
+        $items = SaleItem::whereHas('sale', fn ($q) => $q->whereBetween('sale_date', [$from, $to]))->get();
 
         return [
-            'today_sales_amount' => (float) $totalSalesAmount,
-            'today_profit'       => (float) $totalProfit,
-            'total_filled_stock' => (int) $totalFilledStock,
-            'customer_due'       => (float) $totalCustomerDue,
-            'supplier_due'       => (float) $totalSupplierDue,
-            'monthly_expenses'   => (float) $monthlyExpenses,
-            'today_sales_count'  => $todaySales->count(),
+            'today_sales_amount' => (float) $sales->sum('total_amount'),
+            'today_profit'       => (float) $items->sum('profit'),
+            'total_filled_stock' => (int)   CylinderStock::sum('filled_qty'),
+            'customer_due'       => (float) Customer::sum('total_due'),
+            'supplier_due'       => (float) Supplier::sum('total_due'),
+            'monthly_expenses'   => (float) Expense::thisMonth()->sum('amount'),
+            'today_sales_count'  => $sales->count(),
         ];
     }
 
     public function getWeeklyChart(): array
     {
-        $days = collect(range(6, 0))->map(function ($daysAgo) {
-            $date = now()->subDays($daysAgo)->toDateString();
+        return collect(range(6, 0))->map(function ($daysAgo) {
+            $date   = now()->subDays($daysAgo)->toDateString();
             $amount = Sale::whereDate('sale_date', $date)->sum('total_amount');
-            return [
-                'd'   => now()->subDays($daysAgo)->format('D'),
-                'amt' => (float) $amount,
-                'date'=> $date,
-            ];
-        });
-
-        return $days->values()->all();
+            return ['d' => now()->subDays($daysAgo)->format('D'), 'amt' => (float) $amount, 'date' => $date];
+        })->values()->all();
     }
 
-    public function getRecentSales(int $limit = 10): array
+    public function getRecentSales(string $from, string $to, int $limit = 10): array
     {
         return Sale::with(['customer', 'salesman', 'items.cylinder'])
+            ->whereBetween('sale_date', [$from, $to])
             ->orderByDesc('created_at')
             ->limit($limit)
             ->get()

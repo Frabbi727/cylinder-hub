@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Cylinder;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\Customer;
@@ -26,6 +27,26 @@ class SaleService
     public function createSale(array $data): Sale
     {
         return DB::transaction(function () use ($data) {
+            // Salesmen may only sell cylinders that have been allocated to them
+            if (($data['salesman_role'] ?? null) === 'salesman') {
+                foreach ($data['items'] as $item) {
+                    $available = StockAllocation::where('salesman_id', $data['salesman_id'])
+                        ->where('cylinder_id', $item['cylinder_id'])
+                        ->whereDate('allocation_date', $data['sale_date'])
+                        ->where('is_reconciled', false)
+                        ->get()
+                        ->sum(fn ($a) => max(0, $a->qty - $a->sold_qty));
+
+                    if ($available < (int) $item['qty']) {
+                        $cylinder = Cylinder::find($item['cylinder_id']);
+                        $label    = $cylinder ? "{$cylinder->name} {$cylinder->size}" : "Cylinder #{$item['cylinder_id']}";
+                        throw new \RuntimeException(
+                            "Only {$available} unit(s) of {$label} allocated to you for {$data['sale_date']}. Cannot sell {$item['qty']}."
+                        );
+                    }
+                }
+            }
+
             $totalAmount = 0;
             $allSaleItems = [];
 
@@ -42,7 +63,8 @@ class SaleService
                 $allSaleItems = array_merge($allSaleItems, $fifoResult['breakdown']);
             }
 
-            $paidAmount = (float) ($data['paid_amount'] ?? $totalAmount);
+            $paidAmount  = min((float) ($data['paid_amount'] ?? $totalAmount), $totalAmount);
+            $paymentType = $paidAmount >= $totalAmount ? 'cash' : ($paidAmount > 0 ? 'partial' : 'due');
 
             $sale = Sale::create([
                 'customer_id'  => $data['customer_id'] ?? null,
@@ -50,7 +72,7 @@ class SaleService
                 'sale_date'    => $data['sale_date'],
                 'total_amount' => $totalAmount,
                 'paid_amount'  => $paidAmount,
-                'payment_type' => $data['payment_type'] ?? 'cash',
+                'payment_type' => $paymentType,
                 'notes'        => $data['notes'] ?? null,
             ]);
 

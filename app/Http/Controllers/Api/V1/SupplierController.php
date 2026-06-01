@@ -45,7 +45,7 @@ class SupplierController extends Controller
     public function pay(Request $request, Supplier $supplier): JsonResponse
     {
         $data = $request->validate([
-            'amount'       => 'required|numeric|min:0.01',
+            'amount'       => ['required', 'numeric', 'min:0.01', 'max:'.(float) $supplier->total_due],
             'payment_date' => 'required|date',
             'purchase_id'  => 'nullable|integer|exists:purchases,id',
             'notes'        => 'nullable|string',

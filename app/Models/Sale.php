@@ -14,12 +14,14 @@ class Sale extends Model
         'total_amount', 'paid_amount', 'payment_type', 'notes',
     ];
 
+    protected $appends = ['due_amount'];
+
     protected function casts(): array
     {
         return [
-            'sale_date' => 'date',
+            'sale_date'    => 'date:Y-m-d',
             'total_amount' => 'decimal:2',
-            'paid_amount' => 'decimal:2',
+            'paid_amount'  => 'decimal:2',
         ];
     }
 

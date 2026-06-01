@@ -50,7 +50,7 @@ class CustomerController extends Controller
     public function collect(Request $request, Customer $customer): JsonResponse
     {
         $data = $request->validate([
-            'amount'          => 'required|numeric|min:0.01',
+            'amount'          => ['required', 'numeric', 'min:0.01', 'max:'.(float) $customer->total_due],
             'collection_date' => 'required|date',
             'sale_id'         => 'nullable|integer|exists:sales,id',
             'notes'           => 'nullable|string',

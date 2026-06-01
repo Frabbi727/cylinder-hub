@@ -9,7 +9,7 @@ class AllocationService
 {
     public function __construct(private StockService $stockService) {}
 
-    public function allocate(int $salesmanId, int $cylinderId, int $qty, string $date): StockAllocation
+    public function allocate(int $salesmanId, int $cylinderId, int $qty, float $salePrice, string $date): StockAllocation
     {
         $this->stockService->removeFilledStock($cylinderId, $qty);
 
@@ -18,6 +18,7 @@ class AllocationService
             'cylinder_id'     => $cylinderId,
             'allocation_date' => $date,
             'qty'             => $qty,
+            'sale_price'      => $salePrice,
             'sold_qty'        => 0,
             'returned_qty'    => 0,
             'collected_amount'=> 0,
@@ -31,8 +32,12 @@ class AllocationService
         int $returnedQty,
         float $collectedAmount
     ): StockAllocation {
+        if ($allocation->is_reconciled) {
+            throw new \LogicException('Allocation #'.$allocation->id.' is already reconciled.');
+        }
+
         // Return unsold cylinders back to filled stock
-        $unsold = $allocation->qty - $soldQty - $returnedQty;
+        $unsold = max(0, $allocation->qty - $soldQty - $returnedQty);
         if ($unsold > 0) {
             $this->stockService->addFilledStock($allocation->cylinder_id, $unsold);
         }
