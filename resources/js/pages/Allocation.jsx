@@ -229,7 +229,7 @@ export default function Allocation() {
               </div>
               <div>
                 <label className="label">{t('allocation.salePrice')} *</label>
-                <input type="number" className="input" min="0" step="0.01" placeholder="e.g. 1200"
+                <input type="number" className="input" min="0.01" step="0.01" placeholder="e.g. 1200"
                   value={allocForm.sale_price} onChange={e => setAllocForm(f => ({...f, sale_price: e.target.value}))} required />
               </div>
             </div>

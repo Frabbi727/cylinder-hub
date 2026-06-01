@@ -60,7 +60,7 @@ class SalesmanController extends Controller
             $user->id,
             $data['cylinder_id'],
             $data['qty'],
-            (float) $data['sale_price'],
+            (float) ($data['sale_price'] ?? 0),
             $data['allocation_date'] ?? today()->toDateString()
         );
 

@@ -13,7 +13,7 @@ class StoreAllocationRequest extends FormRequest
         return [
             'cylinder_id'     => 'required|integer|exists:cylinders,id',
             'qty'             => 'required|integer|min:1',
-            'sale_price'      => 'required|numeric|min:0',
+            'sale_price'      => 'nullable|numeric|min:0',
             'allocation_date' => 'nullable|date',
         ];
     }
