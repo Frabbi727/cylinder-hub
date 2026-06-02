@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Api\V1\Auth;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Auth;
+use App\Models\AppNotification;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
@@ -18,27 +19,67 @@ class AuthController extends Controller
         ]);
 
         if (! Auth::attempt($credentials)) {
-            return response()->json(['message' => 'Invalid credentials.'], 401);
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid credentials.',
+            ], 401);
         }
 
-        $user  = Auth::user();
-        $token = $user->createToken('api-token')->plainTextToken;
+        return $this->issueTokenPair(Auth::user(), 'Login successful.');
+    }
 
-        return response()->json([
-            'user'  => $this->userPayload($user),
-            'token' => $token,
-        ]);
+    public function refresh(Request $request): JsonResponse
+    {
+        $abilities = $request->user()->currentAccessToken()->abilities ?? [];
+
+        if (! in_array('refresh', $abilities)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid token type. Send your refresh token to this endpoint.',
+            ], 401);
+        }
+
+        // Revoke all existing tokens before issuing fresh pair
+        $request->user()->tokens()->delete();
+
+        return $this->issueTokenPair($request->user(), 'Token refreshed.');
     }
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
-        return response()->json(['message' => 'Logged out.']);
+        // Revoke all tokens so both access and refresh become invalid
+        $request->user()->tokens()->delete();
+        return $this->deleted('Logged out successfully.');
     }
 
     public function me(Request $request): JsonResponse
     {
-        return response()->json($this->userPayload($request->user()));
+        $user        = $request->user();
+        $unreadCount = AppNotification::where('user_id', $user->id)
+            ->where('is_read', false)
+            ->count();
+
+        return $this->success(array_merge(
+            $this->userPayload($user),
+            ['unread_notifications' => $unreadCount]
+        ));
+    }
+
+    private function issueTokenPair(User $user, string $message): JsonResponse
+    {
+        $accessTtl  = (int) env('ACCESS_TOKEN_TTL',  1440);   // minutes  — default 24 h
+        $refreshTtl = (int) env('REFRESH_TOKEN_TTL', 43200);  // minutes  — default 30 days
+
+        $access  = $user->createToken('access-token',  ['*'],       now()->addMinutes($accessTtl));
+        $refresh = $user->createToken('refresh-token', ['refresh'], now()->addMinutes($refreshTtl));
+
+        return $this->success([
+            'user'          => $this->userPayload($user),
+            'access_token'  => $access->plainTextToken,
+            'refresh_token' => $refresh->plainTextToken,
+            'token_type'    => 'Bearer',
+            'expires_in'    => $accessTtl * 60,  // seconds — useful for mobile timer
+        ], $message);
     }
 
     private function userPayload(User $user): array

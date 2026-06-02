@@ -24,29 +24,35 @@ class SaleController extends Controller
     public function index(Request $request): JsonResponse
     {
         $todayOnly = $request->boolean('today');
-        return response()->json($this->sales->paginate(auth()->user(), $todayOnly));
+        $filters   = $todayOnly ? ['today' => true] : [];
+
+        return $this->paginated(
+            $this->sales->paginate(auth()->user(), $todayOnly),
+            'OK',
+            $filters
+        );
     }
 
     public function store(StoreSaleRequest $request): JsonResponse
     {
-        $data = $request->validated();
+        $data                  = $request->validated();
         $data['salesman_id']   = auth()->id();
         $data['salesman_role'] = auth()->user()->role;
 
         $sale = $this->saleService->createSale($data);
-        return response()->json(new SaleResource($sale), 201);
+        return $this->created(new SaleResource($sale), 'Sale recorded.');
     }
 
-    public function show(Sale $sale): SaleResource
+    public function show(Sale $sale): JsonResponse
     {
-        return new SaleResource($sale->load(['customer', 'salesman', 'items.cylinder']));
+        return $this->success(new SaleResource($sale->load(['customer', 'salesman', 'items.cylinder'])));
     }
 
     public function destroy(Sale $sale): JsonResponse
     {
         $sale->load('items');
         $this->saleService->deleteSale($sale);
-        return response()->json(['message' => 'Sale deleted and stock restored.']);
+        return $this->deleted('Sale deleted and stock restored.');
     }
 
     public function pay(Request $request, Sale $sale): JsonResponse
@@ -88,7 +94,10 @@ class SaleController extends Controller
                 'payment_type' => $newPaid >= round((float) $sale->total_amount, 2) ? 'cash' : 'partial',
             ]);
 
-            return response()->json(new SaleResource($sale->fresh(['customer', 'salesman', 'items.cylinder'])));
+            return $this->success(
+                new SaleResource($sale->fresh(['customer', 'salesman', 'items.cylinder'])),
+                'Payment collected.'
+            );
         });
     }
 }

@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\StoreSupplierRequest;
-use App\Models\Supplier;
 use App\Models\DuePayment;
+use App\Models\Supplier;
 use App\Repositories\Contracts\SupplierRepositoryInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,30 +16,30 @@ class SupplierController extends Controller
 
     public function index(): JsonResponse
     {
-        return response()->json($this->suppliers->paginate());
+        return $this->paginated($this->suppliers->paginate());
     }
 
     public function store(StoreSupplierRequest $request): JsonResponse
     {
         $supplier = $this->suppliers->create($request->validated());
-        return response()->json($supplier, 201);
+        return $this->created($supplier, 'Supplier created.');
     }
 
     public function show(Supplier $supplier): JsonResponse
     {
-        return response()->json($supplier->load(['purchases', 'duePayments']));
+        return $this->success($supplier->load(['purchases', 'duePayments']));
     }
 
     public function update(StoreSupplierRequest $request, Supplier $supplier): JsonResponse
     {
         $supplier = $this->suppliers->update($supplier, $request->validated());
-        return response()->json($supplier);
+        return $this->success($supplier);
     }
 
     public function destroy(Supplier $supplier): JsonResponse
     {
         $this->suppliers->delete($supplier);
-        return response()->json(['message' => 'Supplier deleted.']);
+        return $this->deleted('Supplier deleted.');
     }
 
     public function pay(Request $request, Supplier $supplier): JsonResponse
@@ -61,6 +61,6 @@ class SupplierController extends Controller
         ]);
 
         $supplier->decrement('total_due', $data['amount']);
-        return response()->json($supplier->fresh());
+        return $this->success($supplier->fresh(), 'Payment recorded.');
     }
 }

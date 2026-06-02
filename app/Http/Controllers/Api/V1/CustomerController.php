@@ -9,6 +9,7 @@ use App\Models\DueCollection;
 use App\Repositories\Contracts\CustomerRepositoryInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CustomerController extends Controller
 {
@@ -17,34 +18,36 @@ class CustomerController extends Controller
     public function index(Request $request): JsonResponse
     {
         if ($request->has('search')) {
-            return response()->json($this->customers->search($request->search));
+            return $this->success($this->customers->search($request->search));
         }
-        return response()->json($this->customers->paginate());
+
+        return $this->paginated($this->customers->paginate());
     }
 
     public function store(StoreCustomerRequest $request): JsonResponse
     {
-        $data = $request->validated();
+        $data             = $request->validated();
         $data['added_by'] = auth()->id();
-        $customer = $this->customers->create($data);
-        return response()->json($customer, 201);
+        $customer         = $this->customers->create($data);
+
+        return $this->created($customer);
     }
 
     public function show(Customer $customer): JsonResponse
     {
-        return response()->json($customer->load(['sales', 'dueCollections']));
+        return $this->success($customer->load(['sales', 'dueCollections']));
     }
 
     public function update(StoreCustomerRequest $request, Customer $customer): JsonResponse
     {
         $customer = $this->customers->update($customer, $request->validated());
-        return response()->json($customer);
+        return $this->success($customer);
     }
 
     public function destroy(Customer $customer): JsonResponse
     {
         $this->customers->delete($customer);
-        return response()->json(['message' => 'Customer deleted.']);
+        return $this->deleted('Customer deleted.');
     }
 
     public function collect(Request $request, Customer $customer): JsonResponse
@@ -66,6 +69,55 @@ class CustomerController extends Controller
         ]);
 
         $customer->decrement('total_due', $data['amount']);
-        return response()->json($customer->fresh());
+        return $this->success($customer->fresh(), 'Payment collected.');
+    }
+
+    public function overdue(Request $request): JsonResponse
+    {
+        $days = max(0, (int) $request->get('days', 7));
+        $sort = $request->get('sort', 'amount_desc');
+
+        $query = DB::table('sales as s')
+            ->join('customers as c', 'c.id', '=', 's.customer_id')
+            ->selectRaw('
+                c.id as customer_id,
+                c.name,
+                c.phone,
+                c.total_due,
+                MIN(s.sale_date) as oldest_due_date,
+                DATEDIFF(CURDATE(), MIN(s.sale_date)) as days_overdue,
+                COUNT(s.id) as unpaid_sales_count,
+                (SELECT u.name FROM users u
+                 INNER JOIN sales s2 ON s2.salesman_id = u.id
+                 WHERE s2.customer_id = c.id
+                   AND s2.deleted_at IS NULL
+                   AND (s2.total_amount - s2.paid_amount) > 0
+                 ORDER BY s2.sale_date ASC LIMIT 1) as salesman_name
+            ')
+            ->whereNull('s.deleted_at')
+            ->whereRaw('(s.total_amount - s.paid_amount) > 0')
+            ->whereNotNull('s.customer_id')
+            ->groupBy('c.id', 'c.name', 'c.phone', 'c.total_due')
+            ->havingRaw('DATEDIFF(CURDATE(), MIN(s.sale_date)) >= ?', [$days]);
+
+        match ($sort) {
+            'amount_asc' => $query->orderBy('c.total_due', 'asc'),
+            'days_desc'  => $query->orderByRaw('DATEDIFF(CURDATE(), MIN(s.sale_date)) DESC'),
+            'days_asc'   => $query->orderByRaw('DATEDIFF(CURDATE(), MIN(s.sale_date)) ASC'),
+            default      => $query->orderBy('c.total_due', 'desc'),
+        };
+
+        $results = $query->get()->map(fn ($row) => [
+            'customer_id'       => $row->customer_id,
+            'name'              => $row->name,
+            'phone'             => $row->phone,
+            'total_due'         => round((float) $row->total_due, 2),
+            'oldest_due_date'   => $row->oldest_due_date,
+            'days_overdue'      => (int) $row->days_overdue,
+            'unpaid_sales_count'=> (int) $row->unpaid_sales_count,
+            'salesman_name'     => $row->salesman_name,
+        ]);
+
+        return $this->success($results, 'OK', 200);
     }
 }

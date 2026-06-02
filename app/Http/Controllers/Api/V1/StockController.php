@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\CylinderStock;
 use App\Models\CylinderReturn;
+use App\Models\StockMovement;
 use App\Repositories\Contracts\StockRepositoryInterface;
+use App\Services\StockMovementService;
 use App\Services\StockService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,12 +16,12 @@ class StockController extends Controller
     public function __construct(
         private StockRepositoryInterface $stockRepository,
         private StockService $stockService,
+        private StockMovementService $movements,
     ) {}
 
     public function index(): JsonResponse
     {
-        $stock = $this->stockRepository->all();
-        return response()->json($stock);
+        return $this->success($this->stockRepository->all());
     }
 
     public function returns(Request $request): JsonResponse
@@ -28,7 +29,8 @@ class StockController extends Controller
         $returns = CylinderReturn::with(['cylinder', 'customer', 'recordedBy'])
             ->orderByDesc('return_date')
             ->paginate(15);
-        return response()->json($returns);
+
+        return $this->paginated($returns);
     }
 
     public function storeReturn(Request $request): JsonResponse
@@ -44,12 +46,31 @@ class StockController extends Controller
         ]);
 
         $data['recorded_by'] = auth()->id();
-        $return = CylinderReturn::create($data);
+        $return              = CylinderReturn::create($data);
 
         if ($data['type'] === 'empty_return') {
             $this->stockService->addEmptyStock($data['cylinder_id'], $data['qty']);
         }
 
-        return response()->json($return->load(['cylinder', 'customer']), 201);
+        $this->movements->record(
+            $data['cylinder_id'],
+            'cylinder_return',
+            $data['qty'],
+            auth()->id(),
+            $return->id,
+            "Empty return #{$return->id} — {$data['qty']} cylinders received from customer"
+        );
+
+        return $this->created($return->load(['cylinder', 'customer']), 'Return recorded.');
+    }
+
+    public function history(int $cylinderId): JsonResponse
+    {
+        $movements = StockMovement::with(['recordedBy'])
+            ->where('cylinder_id', $cylinderId)
+            ->orderByDesc('created_at')
+            ->paginate(30);
+
+        return $this->paginated($movements);
     }
 }

@@ -19,13 +19,16 @@ class DashboardController extends Controller
             $request->get('to')
         );
 
-        return response()->json([
-            'summary'      => $this->dashboardService->getSummary($from, $to),
-            'weekly_chart' => $this->dashboardService->getWeeklyChart(),
-            'recent_sales' => $this->dashboardService->getRecentSales($from, $to),
-            'live_stock'   => $this->dashboardService->getLiveStock(),
-            'period'       => ['from' => $from, 'to' => $to],
-        ]);
+        return $this->success(
+            [
+                'summary'      => $this->dashboardService->getSummary($from, $to),
+                'weekly_chart' => $this->dashboardService->getWeeklyChart(),
+                'recent_sales' => $this->dashboardService->getRecentSales($from, $to),
+                'live_stock'   => $this->dashboardService->getLiveStock(),
+            ],
+            'OK',
+            200,
+        );
     }
 
     private function resolvePeriod(string $period, ?string $from, ?string $to): array

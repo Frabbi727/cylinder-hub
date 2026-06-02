@@ -10,7 +10,10 @@ use App\Models\Purchase;
 use App\Models\PurchaseItem;
 use App\Models\Supplier;
 use App\Repositories\Contracts\PurchaseRepositoryInterface;
+use App\Services\AuditLogService;
 use App\Services\FifoService;
+use App\Services\NotificationService;
+use App\Services\StockMovementService;
 use App\Services\StockService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,13 +23,16 @@ class PurchaseController extends Controller
 {
     public function __construct(
         private PurchaseRepositoryInterface $purchases,
-        private FifoService  $fifoService,
+        private FifoService $fifoService,
         private StockService $stockService,
+        private StockMovementService $movements,
+        private AuditLogService $audit,
+        private NotificationService $notifications,
     ) {}
 
     public function index(): JsonResponse
     {
-        return response()->json($this->purchases->paginate());
+        return $this->paginated($this->purchases->paginate());
     }
 
     public function store(StorePurchaseRequest $request): JsonResponse
@@ -49,37 +55,53 @@ class PurchaseController extends Controller
 
             foreach ($data['items'] as $item) {
                 PurchaseItem::create([
-                    'purchase_id'  => $purchase->id,
-                    'cylinder_id'  => $item['cylinder_id'],
-                    'unit_cost'    => $item['unit_cost'],
-                    'qty'          => $item['qty'],
-                    'remaining_qty'=> $item['qty'],
-                    'status'       => 'pending',
+                    'purchase_id'   => $purchase->id,
+                    'cylinder_id'   => $item['cylinder_id'],
+                    'unit_cost'     => $item['unit_cost'],
+                    'qty'           => $item['qty'],
+                    'remaining_qty' => $item['qty'],
+                    'status'        => 'pending',
                 ]);
                 $this->stockService->addFilledStock($item['cylinder_id'], $item['qty']);
+                $this->movements->record(
+                    $item['cylinder_id'],
+                    'purchase',
+                    $item['qty'],
+                    auth()->id(),
+                    $purchase->id,
+                    "Purchase #{$purchase->id} — {$item['qty']} pcs received from supplier"
+                );
             }
 
-            // Update supplier due
             $due = $totalAmount - $paidAmount;
             if ($due > 0) {
                 Supplier::where('id', $data['supplier_id'])->increment('total_due', $due);
             }
 
+            $supplier = Supplier::find($data['supplier_id']);
+            $this->audit->log(
+                'created', 'Purchase', $purchase->id, auth()->id(),
+                "Purchase #{$purchase->id} recorded from {$supplier?->name} (৳" . number_format($totalAmount, 2) . ')',
+                null, $purchase->toArray()
+            );
+            if ($due > 0) {
+                $this->notifications->supplierDueAlert($supplier->fresh());
+            }
+
             return $purchase->fresh(['supplier', 'items.cylinder']);
         });
 
-        return response()->json(new PurchaseResource($purchase), 201);
+        return $this->created(new PurchaseResource($purchase), 'Purchase recorded.');
     }
 
-    public function show(Purchase $purchase): PurchaseResource
+    public function show(Purchase $purchase): JsonResponse
     {
-        return new PurchaseResource($purchase->load(['supplier', 'items.cylinder']));
+        return $this->success(new PurchaseResource($purchase->load(['supplier', 'items.cylinder'])));
     }
 
     public function fifoQueue(int $cylinderId): JsonResponse
     {
-        $queue = $this->purchases->fifoQueue($cylinderId);
-        return response()->json($queue);
+        return $this->success($this->purchases->fifoQueue($cylinderId));
     }
 
     public function simulate(Request $request): JsonResponse
@@ -90,8 +112,7 @@ class PurchaseController extends Controller
             'unit_price'  => 'required|numeric|min:0',
         ]);
 
-        $result = $this->fifoService->simulate($data['cylinder_id'], $data['qty'], $data['unit_price']);
-        return response()->json($result);
+        return $this->success($this->fifoService->simulate($data['cylinder_id'], $data['qty'], $data['unit_price']));
     }
 
     public function pay(Request $request, Purchase $purchase): JsonResponse
@@ -127,7 +148,16 @@ class PurchaseController extends Controller
                 'due_amount'  => round(max(0, $dueAmount - $amount), 2),
             ]);
 
-            return response()->json(new PurchaseResource($purchase->fresh(['supplier', 'items.cylinder'])));
+            $this->audit->log(
+                'paid', 'Purchase', $purchase->id, auth()->id(),
+                "Payment of ৳" . number_format($amount, 2) . " recorded against Purchase #{$purchase->id}",
+                null, ['amount' => $amount]
+            );
+
+            return $this->success(
+                new PurchaseResource($purchase->fresh(['supplier', 'items.cylinder'])),
+                'Payment recorded.'
+            );
         });
     }
 }
