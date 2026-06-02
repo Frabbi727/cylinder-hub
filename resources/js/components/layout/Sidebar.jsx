@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import {
   Gauge, Package, Layers, Truck, ShoppingCart,
-  Users, Building2, Receipt, Flame, LogOut
+  Users, Building2, Receipt, Flame, LogOut, PlusCircle
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -34,15 +34,17 @@ export default function Sidebar() {
 
   const NAV_SALESMAN = [
     { group: t('nav.sales'), items: [
-      { path: '/sales', label: t('nav.sales'), icon: ShoppingCart },
+      { path: '/sales',     label: t('sales.myDay'),   icon: ShoppingCart },
+      { path: '/sales/new', label: t('sales.newSale'), icon: PlusCircle },
     ]},
   ];
 
   const NAV = isSalesman ? NAV_SALESMAN : NAV_ADMIN;
 
-  const isActive = (path) => path === '/'
-    ? location.pathname === '/'
-    : location.pathname.startsWith(path);
+  const isActive = (path) =>
+    path === '/' || path === '/sales'
+      ? location.pathname === path
+      : location.pathname.startsWith(path);
 
   const handleLogout = async () => {
     await logout();

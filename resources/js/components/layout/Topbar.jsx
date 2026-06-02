@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Calendar, Bell, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
@@ -7,6 +7,7 @@ import i18n from '../../i18n';
 
 export default function Topbar({ onQuickSale }) {
   const location  = useLocation();
+  const navigate  = useNavigate();
   const { t }     = useTranslation();
   const { isSalesman } = useAuth();
   const path      = location.pathname;
@@ -23,7 +24,8 @@ export default function Topbar({ onQuickSale }) {
   };
 
   const SALESMAN_META = {
-    '/sales': [t('sales.myDaySummary'), t('sales.todaySales') + ' · ' + t('allocation.myAllocations')],
+    '/sales':     [t('sales.myDay'),   t('sales.todaySales') + ' · ' + t('allocation.myAllocations')],
+    '/sales/new': [t('sales.newSale'), t('sales.newSaleSubtitle')],
   };
 
   const META = isSalesman ? SALESMAN_META : ADMIN_META;
@@ -50,8 +52,9 @@ export default function Topbar({ onQuickSale }) {
           {i18n.language === 'en' ? '🇧🇩 বাংলা' : '🇬🇧 English'}
         </button>
         <button className="icon-btn" title={t('common.close')}><Bell size={18} /></button>
-        <button className="btn btn-primary btn-sm" onClick={onQuickSale}>
-          <Plus size={16} /> {t('sales.quickSale')}
+        <button className="btn btn-primary btn-sm"
+          onClick={() => isSalesman ? navigate('/sales/new') : onQuickSale()}>
+          <Plus size={16} /> {isSalesman ? t('sales.newSale') : t('sales.quickSale')}
         </button>
       </div>
     </header>

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useSales } from '../hooks/useSales';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -10,7 +11,7 @@ import StatusPill     from '../components/ui/StatusPill';
 import CylBadge       from '../components/ui/CylBadge';
 import Modal          from '../components/ui/Modal';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
-import { Trash2, CreditCard, AlertCircle, Package, RotateCcw, Zap } from 'lucide-react';
+import { Trash2, CreditCard, AlertCircle, Package, RotateCcw, Plus } from 'lucide-react';
 
 const TK       = (n) => '৳' + Number(n || 0).toLocaleString('en-US');
 const todayStr = new Date().toISOString().split('T')[0];
@@ -125,10 +126,14 @@ export default function Sales() {
   const activeAllocations    = allAllocations.filter(a => !a.is_reconciled);
   const reconciledAllocations= allAllocations.filter(a =>  a.is_reconciled);
 
-  // Summary stats
-  const totalAllocated = activeAllocations.reduce((s, a) => s + a.qty, 0);
-  const totalSold      = activeAllocations.reduce((s, a) => s + (a.sold_qty || 0), 0);
-  const totalRemaining = activeAllocations.reduce((s, a) => s + Math.max(0, a.qty - (a.sold_qty || 0)), 0);
+  // Summary stats — include all of today's allocations (active + reconciled)
+  const totalAllocated = allAllocations.reduce((s, a) => s + a.qty, 0);
+  const totalSold      = allAllocations.reduce((s, a) => s + (a.sold_qty || 0), 0);
+  const totalReturned  = allAllocations.reduce((s, a) => s + (a.returned_qty || 0), 0);
+  const totalRemaining = activeAllocations.reduce((s, a) => s + Math.max(0, a.qty - (a.sold_qty || 0) - (a.returned_qty || 0)), 0);
+  // Cash collected = today's sales paid amounts + any reconciled collected_amount
+  const reconciledCash = reconciledAllocations.reduce((s, a) => s + parseFloat(a.collected_amount || 0), 0);
+  const totalCashCollected = todayCashCollected + reconciledCash;
 
   // All cylinders for empty return dropdown
   const { data: cylinders } = useQuery({
@@ -213,7 +218,7 @@ export default function Sales() {
           { label: t('sales.totalPcs'),         val: `${totalAllocated} pcs`, color:'var(--text-1)' },
           { label: t('sales.soldPcs'),           val: `${totalSold} pcs`,     color:'var(--success)' },
           { label: t('sales.remainingPcs'),      val: `${totalRemaining} pcs`,color:'var(--primary)' },
-          { label: t('sales.cashCollectedToday'),val: TK(todayCashCollected), color:'var(--warning)' },
+          { label: t('sales.cashCollectedToday'),val: TK(totalCashCollected), color:'var(--warning)' },
         ].map(({ label, val, color }) => (
           <div key={label} className="scard" style={{ textAlign:'center' }}>
             <div style={{ fontSize:18, fontWeight:700, color }}>{val}</div>
@@ -235,33 +240,45 @@ export default function Sales() {
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(260px, 1fr))', gap:12 }}>
           {/* Active allocations */}
           {activeAllocations.map(a => {
-            const remaining = Math.max(0, a.qty - (a.sold_qty || 0));
-            const pct = a.qty > 0 ? Math.round(((a.qty - remaining) / a.qty) * 100) : 0;
+            const remaining = Math.max(0, a.qty - (a.sold_qty || 0) - (a.returned_qty || 0));
+            const soldPct   = a.qty > 0 ? Math.round(((a.sold_qty || 0) / a.qty) * 100) : 0;
+            const retPct    = a.qty > 0 ? Math.round(((a.returned_qty || 0) / a.qty) * 100) : 0;
             return (
-              <div key={a.id} className="card" style={{ padding:14 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+              <div key={a.id} className="card" style={{ padding:16 }}>
+                {/* Header */}
+                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
                   {a.cylinder && <CylBadge cylinder={a.cylinder} size="sm" />}
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontWeight:700, fontSize:14 }}>{a.cylinder?.name} {a.cylinder?.size}</div>
                     <div style={{ color:'var(--primary)', fontSize:13, fontWeight:600 }}>{TK(a.sale_price)}/{t('common.pcs')}</div>
                   </div>
+                  <div style={{ textAlign:'right' }}>
+                    <div style={{ fontSize:20, fontWeight:800, color: remaining === 0 ? 'var(--success)' : 'var(--text-1)' }}>{remaining}</div>
+                    <div className="dim tiny" style={{ fontSize:10 }}>{t('allocation.remaining')}</div>
+                  </div>
                 </div>
-                <div style={{ background:'var(--border-soft)', borderRadius:4, height:6, marginBottom:10, overflow:'hidden' }}>
-                  <div style={{ width:`${pct}%`, height:'100%', background:'var(--primary)', borderRadius:4, transition:'width 0.3s' }} />
+
+                {/* Progress bar: sold (teal) + returned (amber) */}
+                <div style={{ background:'var(--border-soft)', borderRadius:4, height:6, marginBottom:12, overflow:'hidden', display:'flex' }}>
+                  <div style={{ width:`${soldPct}%`, height:'100%', background:'var(--success)', borderRadius:4, transition:'width 0.3s' }} />
+                  <div style={{ width:`${retPct}%`, height:'100%', background:'var(--warning)', borderRadius:'0 4px 4px 0', transition:'width 0.3s' }} />
                 </div>
-                <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, marginBottom:10 }}>
+
+                {/* 4-stat row */}
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', fontSize:12, marginBottom:12 }}>
                   {[
                     [a.qty,             t('allocation.allocated'), 'var(--text-1)'],
                     [a.sold_qty||0,     t('allocation.sold'),      'var(--success)'],
                     [a.returned_qty||0, t('allocation.returned'),  'var(--warning)'],
-                    [remaining,         t('allocation.remaining'), 'var(--primary)'],
+                    [remaining,         t('allocation.withHim'),   remaining === 0 ? 'var(--text-3)' : 'var(--primary)'],
                   ].map(([v, l, c]) => (
                     <div key={l} style={{ textAlign:'center' }}>
-                      <div style={{ fontWeight:700, color:c }}>{v}</div>
+                      <div style={{ fontWeight:700, color:c, fontSize:15 }}>{v}</div>
                       <div className="dim tiny">{l}</div>
                     </div>
                   ))}
                 </div>
+
                 <button className="btn btn-soft btn-sm" style={{ width:'100%', justifyContent:'center' }}
                   onClick={() => openReconcile(a)}>
                   <RotateCcw size={13} /> {t('allocation.reconcileDay')}
@@ -270,16 +287,30 @@ export default function Sales() {
             );
           })}
 
-          {/* Reconciled allocations (collapsed summary) */}
+          {/* Reconciled allocations (summary) */}
           {reconciledAllocations.map(a => (
-            <div key={a.id} className="card" style={{ padding:14, opacity:0.65 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <div key={a.id} className="card" style={{ padding:16, opacity:0.7, borderLeft:'3px solid var(--success)' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
                 {a.cylinder && <CylBadge cylinder={a.cylinder} size="sm" />}
                 <div style={{ flex:1 }}>
-                  <div style={{ fontWeight:600, fontSize:13 }}>{a.cylinder?.name} {a.cylinder?.size}</div>
-                  <div className="dim tiny">{a.sold_qty} {t('allocation.sold')} · {a.returned_qty} {t('allocation.returned')}</div>
+                  <div style={{ fontWeight:700, fontSize:13 }}>{a.cylinder?.name} {a.cylinder?.size}</div>
+                  <div style={{ fontSize:12, color:'var(--primary)' }}>{TK(a.sale_price)}/{t('common.pcs')}</div>
                 </div>
                 <span className="pill pill-teal" style={{ fontSize:11 }}>✓ {t('status.reconciled')}</span>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', fontSize:12, paddingTop:8, borderTop:'1px solid var(--border-soft)' }}>
+                <div style={{ textAlign:'center' }}>
+                  <div style={{ fontWeight:700, color:'var(--success)' }}>{a.sold_qty||0}</div>
+                  <div className="dim tiny">{t('allocation.sold')}</div>
+                </div>
+                <div style={{ textAlign:'center' }}>
+                  <div style={{ fontWeight:700, color:'var(--warning)' }}>{a.returned_qty||0}</div>
+                  <div className="dim tiny">{t('allocation.returned')}</div>
+                </div>
+                <div style={{ textAlign:'center' }}>
+                  <div style={{ fontWeight:700, color:'var(--primary)' }}>{TK(a.collected_amount||0)}</div>
+                  <div className="dim tiny">{t('allocation.collected')}</div>
+                </div>
               </div>
             </div>
           ))}
@@ -315,26 +346,39 @@ export default function Sales() {
         ))}
       </div>
 
-      {/* Today totals footer */}
-      {activeTab === 'today' && todaySales.length > 0 && (
-        <div style={{ display:'flex', gap:16, marginBottom:12, padding:'8px 14px', background:'var(--bg)', borderRadius:8, fontSize:13 }}>
-          <span className="dim">{t('common.total')}: <strong>{TK(todaySales.reduce((s,x) => s+parseFloat(x.total_amount||0),0))}</strong></span>
-          <span style={{ color:'var(--success)' }}>{t('common.paid')}: <strong>{TK(todaySales.reduce((s,x) => s+parseFloat(x.paid_amount||0),0))}</strong></span>
-          <span style={{ color:'var(--accent)' }}>{t('common.due')}: <strong>{TK(todaySales.reduce((s,x) => s+parseFloat(x.due_amount||0),0))}</strong></span>
-        </div>
+      {/* Today tab: summary bar + cards */}
+      {activeTab === 'today' && (
+        todaySales.length === 0 ? (
+          <div className="card" style={{ textAlign:'center', padding:32 }}>
+            <div className="dim" style={{ marginBottom:12 }}>{t('sales.noSales')}</div>
+            <Link to="/sales/new" className="btn btn-primary btn-sm">
+              <Plus size={14} /> {t('sales.newSale')}
+            </Link>
+          </div>
+        ) : (
+          <>
+            <div style={{ display:'flex', gap:16, marginBottom:12, padding:'8px 14px', background:'var(--bg)', borderRadius:8, fontSize:13 }}>
+              <span className="dim">{t('common.total')}: <strong>{TK(todaySales.reduce((s,x) => s+parseFloat(x.total_amount||0),0))}</strong></span>
+              <span style={{ color:'var(--success)' }}>{t('common.paid')}: <strong>{TK(todaySales.reduce((s,x) => s+parseFloat(x.paid_amount||0),0))}</strong></span>
+              <span style={{ color:'var(--accent)' }}>{t('common.due')}: <strong>{TK(todaySales.reduce((s,x) => s+parseFloat(x.due_amount||0),0))}</strong></span>
+            </div>
+            {todaySales.map(s => <SaleCard key={s.id} sale={s} onPay={openPay} t={t} />)}
+          </>
+        )
       )}
 
-      {activeTab === 'dues' && outstandingDues.length === 0 && (
-        <div className="card" style={{ textAlign:'center', padding:32, color:'var(--text-3)' }}>
-          {t('sales.noDuesToday')}
-        </div>
+      {/* All sales tab */}
+      {activeTab === 'all' && (
+        sales.length === 0
+          ? <div className="card" style={{ textAlign:'center', padding:32, color:'var(--text-3)' }}>{t('sales.noSales')}</div>
+          : sales.map(s => <SaleCard key={s.id} sale={s} onPay={openPay} t={t} />)
       )}
 
-      {tabRows.length > 0 && (
-        <SalesTable
-          rows={tabRows} isSalesman={true} isAdmin={false}
-          onPay={openPay} onDelete={deleteSale} isDeleting={isDeleting} t={t}
-        />
+      {/* Outstanding dues tab */}
+      {activeTab === 'dues' && (
+        outstandingDues.length === 0
+          ? <div className="card" style={{ textAlign:'center', padding:32, color:'var(--text-3)' }}>{t('sales.noDuesToday')}</div>
+          : outstandingDues.map(s => <SaleCard key={s.id} sale={s} onPay={openPay} t={t} highlight />)
       )}
 
       {/* ── Collect payment modal ─────────────────────────────────── */}
@@ -464,6 +508,54 @@ export default function Sales() {
           </form>
         </Modal>
       )}
+    </div>
+  );
+}
+
+/* ── Sale card (salesman list view) ────────────────────────────── */
+function SaleCard({ sale, onPay, t, highlight }) {
+  const TK = (n) => '৳' + Number(n || 0).toLocaleString('en-US');
+  const items = sale.items || [];
+  return (
+    <div className="card" style={{ padding:16, marginBottom:10, borderLeft: highlight && sale.due_amount > 0 ? '3px solid var(--accent)' : undefined }}>
+      {/* Header */}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
+        <div>
+          <div style={{ fontWeight:700, fontSize:15 }}>{sale.customer?.name || t('sales.walkIn')}</div>
+          <div className="dim tiny">{sale.sale_date}</div>
+        </div>
+        <StatusPill status={sale.payment_type} />
+      </div>
+
+      {/* Items */}
+      <div style={{ marginBottom:12 }}>
+        {items.map((it, i) => {
+          const lineTotal = parseFloat(it.qty || 0) * parseFloat(it.unit_price || 0);
+          return (
+            <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:13, marginBottom:5 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                {it.cylinder && <CylBadge cylinder={it.cylinder} size="sm" />}
+                <span style={{ color:'var(--text-2)' }}>{it.cylinder?.name} {it.cylinder?.size} × {it.qty}</span>
+              </div>
+              <span style={{ fontWeight:600, color:'var(--text-1)' }}>{TK(lineTotal)}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Footer: amounts + action */}
+      <div style={{ display:'flex', gap:16, alignItems:'center', paddingTop:10, borderTop:'1px solid var(--border-soft)', flexWrap:'wrap' }}>
+        <span className="dim tiny">{t('common.total')}: <strong style={{ color:'var(--text-1)' }}>{TK(sale.total_amount)}</strong></span>
+        <span style={{ fontSize:12, color:'var(--success)' }}>{t('common.paid')}: <strong>{TK(sale.paid_amount)}</strong></span>
+        {sale.due_amount > 0 && (
+          <span style={{ fontSize:12, color:'var(--accent)', fontWeight:700 }}>{t('common.due')}: {TK(sale.due_amount)}</span>
+        )}
+        {sale.due_amount > 0 && (
+          <button className="btn btn-soft btn-sm" style={{ marginLeft:'auto' }} onClick={() => onPay(sale)}>
+            <CreditCard size={13} /> {t('sales.collectBalance')} {TK(sale.due_amount)}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

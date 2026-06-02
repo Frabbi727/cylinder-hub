@@ -188,7 +188,18 @@
     "remainingDue": "Remaining Due",
     "alreadyPaid": "Already Paid",
     "collectionDate": "Collection Date",
-    "partialPaidHint": "Enter how much you collected"
+    "partialPaidHint": "Enter how much you collected",
+    "myDay": "My Day",
+    "newSale": "New Sale",
+    "newSaleSubtitle": "Record a new cylinder sale",
+    "dueAfterSale": "due after this sale",
+    "noStockAllocated": "No stock allocated for today. Ask admin to allocate cylinders.",
+    "confirmLeave": "You have unsaved items. Leave anyway?",
+    "orderSummary": "Order Summary",
+    "paymentCash": "Cash",
+    "paymentPartial": "Partial",
+    "paymentDue": "Due Later",
+    "partialAmountNow": "Amount Collected Now ৳"
   },
   "customers": {
     "addCustomer": "Add Customer",

@@ -35,7 +35,7 @@ class SaleService
                         ->whereDate('allocation_date', $data['sale_date'])
                         ->where('is_reconciled', false)
                         ->get()
-                        ->sum(fn ($a) => max(0, $a->qty - $a->sold_qty));
+                        ->sum(fn ($a) => max(0, $a->qty - $a->sold_qty - $a->returned_qty));
 
                     if ($available < (int) $item['qty']) {
                         $cylinder = Cylinder::find($item['cylinder_id']);
@@ -106,24 +106,30 @@ class SaleService
      */
     private function updateAllocationSoldQty(int $salesmanId, array $items, string $saleDate): void
     {
-        // Group items by cylinder_id so we make one update per cylinder
         $qtyByCylinder = [];
         foreach ($items as $item) {
             $cid = (int) $item['cylinder_id'];
             $qtyByCylinder[$cid] = ($qtyByCylinder[$cid] ?? 0) + (int) $item['qty'];
         }
 
-        foreach ($qtyByCylinder as $cylinderId => $qty) {
-            // Find the oldest unreconciled allocation for this salesman+cylinder+date
-            $allocation = StockAllocation::where('salesman_id', $salesmanId)
+        foreach ($qtyByCylinder as $cylinderId => $totalQty) {
+            // Distribute across allocations oldest-first, respecting each allocation's capacity
+            $allocations = StockAllocation::where('salesman_id', $salesmanId)
                 ->where('cylinder_id', $cylinderId)
                 ->whereDate('allocation_date', $saleDate)
                 ->where('is_reconciled', false)
                 ->orderBy('created_at', 'asc')
-                ->first();
+                ->get();
 
-            if ($allocation) {
-                $allocation->increment('sold_qty', $qty);
+            $remaining = $totalQty;
+            foreach ($allocations as $allocation) {
+                if ($remaining <= 0) break;
+                $capacity = max(0, $allocation->qty - $allocation->sold_qty - $allocation->returned_qty);
+                $take     = min($remaining, $capacity);
+                if ($take > 0) {
+                    $allocation->increment('sold_qty', $take);
+                    $remaining -= $take;
+                }
             }
         }
     }
@@ -152,20 +158,29 @@ class SaleService
                 $this->stockService->addFilledStock($saleItem->cylinder_id, $saleItem->qty);
             }
 
-            // Reverse sold_qty on the allocation
+            // Reverse sold_qty on the allocations (newest-first to undo in reverse order)
             $qtyByCylinder = [];
             foreach ($sale->items as $saleItem) {
                 $cid = $saleItem->cylinder_id;
                 $qtyByCylinder[$cid] = ($qtyByCylinder[$cid] ?? 0) + $saleItem->qty;
             }
-            foreach ($qtyByCylinder as $cylinderId => $qty) {
-                StockAllocation::where('salesman_id', $sale->salesman_id)
+            foreach ($qtyByCylinder as $cylinderId => $totalQty) {
+                $allocations = StockAllocation::where('salesman_id', $sale->salesman_id)
                     ->where('cylinder_id', $cylinderId)
                     ->whereDate('allocation_date', $sale->sale_date)
                     ->where('is_reconciled', false)
-                    ->orderBy('created_at', 'asc')
-                    ->first()
-                    ?->decrement('sold_qty', $qty);
+                    ->orderBy('created_at', 'desc')
+                    ->get();
+
+                $remaining = $totalQty;
+                foreach ($allocations as $allocation) {
+                    if ($remaining <= 0) break;
+                    $take = min($remaining, $allocation->sold_qty);
+                    if ($take > 0) {
+                        $allocation->decrement('sold_qty', $take);
+                        $remaining -= $take;
+                    }
+                }
             }
 
             // Reverse customer due if applicable

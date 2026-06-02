@@ -188,7 +188,18 @@
     "remainingDue": "অবশিষ্ট বাকি",
     "alreadyPaid": "ইতোমধ্যে পরিশোধিত",
     "collectionDate": "সংগ্রহের তারিখ",
-    "partialPaidHint": "কত টাকা পেলেন লিখুন"
+    "partialPaidHint": "কত টাকা পেলেন লিখুন",
+    "myDay": "আমার দিন",
+    "newSale": "নতুন বিক্রয়",
+    "newSaleSubtitle": "নতুন সিলিন্ডার বিক্রয় রেকর্ড করুন",
+    "dueAfterSale": "এই বিক্রয়ের পর বাকি",
+    "noStockAllocated": "আজ কোনো স্টক বরাদ্দ নেই। অ্যাডমিনকে বলুন।",
+    "confirmLeave": "অসংরক্ষিত আইটেম আছে। তবুও যাবেন?",
+    "orderSummary": "অর্ডার সারসংক্ষেপ",
+    "paymentCash": "নগদ",
+    "paymentPartial": "আংশিক",
+    "paymentDue": "বাকি পরে",
+    "partialAmountNow": "এখন সংগৃহীত পরিমাণ ৳"
   },
   "customers": {
     "addCustomer": "গ্রাহক যোগ করুন",
