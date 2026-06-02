@@ -10,7 +10,7 @@ import {
 export default function Sidebar() {
   const navigate  = useNavigate();
   const location  = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, isSalesman } = useAuth();
   const { t } = useTranslation();
 
   const NAV_ADMIN = [
@@ -38,7 +38,7 @@ export default function Sidebar() {
     ]},
   ];
 
-  const NAV = user?.role === 'admin' ? NAV_ADMIN : NAV_SALESMAN;
+  const NAV = isSalesman ? NAV_SALESMAN : NAV_ADMIN;
 
   const isActive = (path) => path === '/'
     ? location.pathname === '/'
@@ -55,7 +55,7 @@ export default function Sidebar() {
         <span className="mark"><Flame size={21} /></span>
         <div>
           <div className="name">Cylinder<span style={{ color: 'var(--primary)' }}>Hub</span></div>
-          <div className="sub">{user?.role === 'admin' ? t('nav.adminConsole') : t('nav.salesman')}</div>
+          <div className="sub">{isSalesman ? t('nav.salesman') : t('nav.adminConsole')}</div>
         </div>
       </div>
 

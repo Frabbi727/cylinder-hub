@@ -1,23 +1,29 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { Flame, Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
-  const [form, setForm]     = useState({ email: 'admin@cylinderhub.com', password: 'password' });
+  const [form, setForm]     = useState({ email: '', password: '' });
   const [error, setError]   = useState('');
   const [showPw, setShowPw] = useState(false);
-  const { login, loading }  = useAuth();
+  const { login, loading, user } = useAuth();
   const navigate            = useNavigate();
   const { t }               = useTranslation();
+
+  // Redirect already-authenticated users to their home page
+  if (user) {
+    return <Navigate to={user.role === 'admin' ? '/' : '/sales'} replace />;
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     try {
-      await login(form);
-      navigate('/');
+      const data = await login(form);
+      // Navigate to role-appropriate home immediately — no double redirect
+      navigate(data.user.role === 'admin' ? '/' : '/sales', { replace: true });
     } catch (err) {
       setError(err.response?.data?.message || t('auth.invalidCredentials'));
     }

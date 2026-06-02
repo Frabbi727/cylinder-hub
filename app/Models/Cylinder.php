@@ -21,6 +21,15 @@ class Cylinder extends Model
         return $this->hasMany(PurchaseItem::class);
     }
 
+    public function firstFifoItem()
+    {
+        return $this->hasOne(PurchaseItem::class)
+            ->whereIn('status', ['pending', 'active'])
+            ->where('remaining_qty', '>', 0)
+            ->orderBy('created_at', 'asc')
+            ->orderBy('id', 'asc');
+    }
+
     public function saleItems()
     {
         return $this->hasMany(SaleItem::class);

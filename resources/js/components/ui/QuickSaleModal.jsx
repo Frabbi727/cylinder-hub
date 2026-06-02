@@ -7,8 +7,9 @@ import { customerService }  from '../../services/customerService';
 import { salesmanService }  from '../../services/salesmanService';
 import { saleService }      from '../../services/saleService';
 import { useAuth }          from '../../contexts/AuthContext';
+import { UserPlus }         from 'lucide-react';
 
-const TK = (n) => '৳' + Number(n || 0).toLocaleString('en-US');
+const TK       = (n) => '৳' + Number(n || 0).toLocaleString('en-US');
 const todayStr = new Date().toISOString().split('T')[0];
 const DEFAULT_FORM = {
   customer_id: '', sale_date: todayStr,
@@ -19,13 +20,16 @@ const DEFAULT_FORM = {
 export default function QuickSaleModal({ onClose }) {
   const qc = useQueryClient();
   const { t } = useTranslation();
-  const { user } = useAuth();
-  const [form, setForm] = useState(DEFAULT_FORM);
-  const [error, setError] = useState('');
+  const { user, isSalesman } = useAuth();
 
-  const isSalesman = user?.role === 'salesman';
+  const [form,          setForm]          = useState(DEFAULT_FORM);
+  const [error,         setError]         = useState('');
+  const [custSearch,    setCustSearch]    = useState('');
+  const [showCustInput, setShowCustInput] = useState(false);
+  const [newCustForm,   setNewCustForm]   = useState({ name: '', phone: '' });
+  const [custDropOpen,  setCustDropOpen]  = useState(false);
 
-  // Admins see all cylinders; salesmen only see their today's allocations
+  /* ── Data fetching ──────────────────────────────────────────────── */
   const { data: cylinders } = useQuery({
     queryKey: ['cylinders'],
     queryFn:  cylinderService.getAll,
@@ -43,7 +47,7 @@ export default function QuickSaleModal({ onClose }) {
     queryFn:  () => customerService.getAll(),
   });
 
-  // Build allocMap: cylinder_id → { cylinder, remaining, sale_price }
+  /* ── Allocation map for salesman ────────────────────────────────── */
   const allocMap = useMemo(() => {
     if (!isSalesman) return {};
     const allocs = myData?.salesman?.allocations || [];
@@ -60,13 +64,20 @@ export default function QuickSaleModal({ onClose }) {
     ? Object.values(allocMap).map(e => e.cylinder).filter(Boolean)
     : (Array.isArray(cylinders) ? cylinders : (cylinders?.data || []));
 
-  const customerList = customers?.data || [];
+  const customerList  = customers?.data || [];
+  const filteredCusts = custSearch.trim()
+    ? customerList.filter(c => c.name.toLowerCase().includes(custSearch.toLowerCase()) || (c.phone || '').includes(custSearch))
+    : customerList;
 
-  const mutation = useMutation({
+  const selectedCustomer = customerList.find(c => String(c.id) === String(form.customer_id));
+
+  /* ── Mutations ──────────────────────────────────────────────────── */
+  const saleMutation = useMutation({
     mutationFn: saleService.create,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['dashboard'] });
       qc.invalidateQueries({ queryKey: ['sales'] });
+      qc.invalidateQueries({ queryKey: ['sales-today'] });
       qc.invalidateQueries({ queryKey: ['my-allocations'] });
       setForm(DEFAULT_FORM);
       onClose();
@@ -74,12 +85,25 @@ export default function QuickSaleModal({ onClose }) {
     onError: (e) => setError(e.response?.data?.message || 'Failed to create sale'),
   });
 
+  const addCustomerMutation = useMutation({
+    mutationFn: customerService.create,
+    onSuccess: (newCust) => {
+      qc.invalidateQueries({ queryKey: ['customers'] });
+      setForm(f => ({ ...f, customer_id: String(newCust.id) }));
+      setCustSearch(newCust.name);
+      setShowCustInput(false);
+      setNewCustForm({ name: '', phone: '' });
+      setCustDropOpen(false);
+    },
+    onError: () => {},
+  });
+
+  /* ── Item helpers ───────────────────────────────────────────────── */
   const setItem = (i, field, val) => {
     const items = [...form.items];
     items[i] = { ...items[i], [field]: val };
-    // When salesman changes cylinder, auto-fill price from allocation and cap qty
     if (field === 'cylinder_id' && isSalesman) {
-      const alloc = allocMap[val];
+      const alloc   = allocMap[val];
       items[i].qty        = Math.min(parseInt(items[i].qty) || 1, alloc?.remaining || 1);
       items[i].unit_price = alloc?.sale_price ? String(alloc.sale_price) : '';
     }
@@ -106,19 +130,32 @@ export default function QuickSaleModal({ onClose }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
-    const data = {
+    saleMutation.mutate({
       ...form,
-      customer_id: form.customer_id || null,
+      customer_id: form.customer_id ? parseInt(form.customer_id) : null,
       paid_amount: form.payment_type === 'cash' ? totalAmount : parseFloat(form.paid_amount || 0),
       items: form.items.map(it => ({
         cylinder_id: parseInt(it.cylinder_id),
         qty:         parseInt(it.qty),
         unit_price:  parseFloat(it.unit_price),
       })),
-    };
-    mutation.mutate(data);
+    });
   };
 
+  const selectCustomer = (c) => {
+    setForm(f => ({ ...f, customer_id: String(c.id) }));
+    setCustSearch(c.name);
+    setCustDropOpen(false);
+  };
+
+  const clearCustomer = () => {
+    setForm(f => ({ ...f, customer_id: '' }));
+    setCustSearch('');
+    setCustDropOpen(false);
+    setShowCustInput(false);
+  };
+
+  /* ── Render ──────────────────────────────────────────────────────── */
   return (
     <Modal title={t('sales.quickSale')} onClose={handleClose} size="md">
       <form onSubmit={handleSubmit}>
@@ -126,48 +163,97 @@ export default function QuickSaleModal({ onClose }) {
           <div style={{ background:'var(--error-bg)',color:'var(--error)',borderRadius:8,padding:'10px 14px',marginBottom:16,fontSize:13 }}>{error}</div>
         )}
 
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
-          <div>
-            <label className="label">{t('nav.customers')}</label>
-            <select className="select" value={form.customer_id} onChange={e => setForm(f => ({...f, customer_id: e.target.value}))}>
-              <option value="">{t('sales.walkIn')}</option>
-              {customerList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="label">{t('sales.saleDate')}</label>
-            <input type="date" className="input" value={form.sale_date}
-              readOnly={isSalesman}
-              style={isSalesman ? { background:'var(--bg)', cursor:'default' } : {}}
-              onChange={e => !isSalesman && setForm(f => ({...f, sale_date: e.target.value}))} required />
-          </div>
-        </div>
-
+        {/* ── Customer with quick-add ─────────────────────────────── */}
         <div style={{ marginBottom:12 }}>
-          <label className="label">{t('sales.paymentType')}</label>
-          <select className="select" value={form.payment_type} onChange={e => setForm(f => ({...f, payment_type: e.target.value}))}>
-            <option value="cash">{t('status.cash')}</option>
-            <option value="due">{t('status.due')}</option>
-            <option value="partial">{t('status.partial')}</option>
-          </select>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+            <label className="label" style={{ margin:0 }}>{t('nav.customers')}</label>
+            {form.customer_id && (
+              <button type="button" className="btn btn-ghost btn-sm" style={{ fontSize:11 }} onClick={clearCustomer}>
+                ✕ {t('sales.walkIn')}
+              </button>
+            )}
+          </div>
+
+          {!form.customer_id ? (
+            <div style={{ position:'relative' }}>
+              <input
+                className="input"
+                placeholder={t('sales.selectCustomer')}
+                value={custSearch}
+                onChange={e => { setCustSearch(e.target.value); setCustDropOpen(true); setShowCustInput(false); }}
+                onFocus={() => setCustDropOpen(true)}
+                autoComplete="off"
+              />
+              {custDropOpen && (
+                <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:50, background:'var(--surface)', border:'1px solid var(--border-soft)', borderRadius:8, boxShadow:'0 4px 16px rgba(0,0,0,.12)', maxHeight:220, overflowY:'auto', marginTop:4 }}>
+                  {/* Walk-in option */}
+                  <div style={{ padding:'10px 14px', fontSize:13, cursor:'pointer', borderBottom:'1px solid var(--border-soft)', color:'var(--text-3)' }}
+                    onMouseDown={() => { setCustDropOpen(false); setCustSearch(''); }}>
+                    {t('sales.walkIn')}
+                  </div>
+
+                  {/* Customer list */}
+                  {filteredCusts.slice(0, 8).map(c => (
+                    <div key={c.id} style={{ padding:'10px 14px', fontSize:13, cursor:'pointer' }}
+                      onMouseDown={() => selectCustomer(c)}
+                      onMouseEnter={e => e.currentTarget.style.background='var(--bg)'}
+                      onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                      <div style={{ fontWeight:600 }}>{c.name}</div>
+                      {c.phone && <div className="dim tiny">{c.phone}</div>}
+                    </div>
+                  ))}
+
+                  {/* Quick-add if typed name has no full match */}
+                  {custSearch.trim() && !customerList.find(c => c.name.toLowerCase() === custSearch.toLowerCase()) && (
+                    <div style={{ padding:'10px 14px', fontSize:13, cursor:'pointer', borderTop:'1px solid var(--border-soft)', color:'var(--primary)', display:'flex', alignItems:'center', gap:6 }}
+                      onMouseDown={() => { setShowCustInput(true); setCustDropOpen(false); setNewCustForm({ name: custSearch.trim(), phone: '' }); }}>
+                      <UserPlus size={14} /> {t('sales.quickAddCustomer')} &quot;{custSearch.trim()}&quot;
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ background:'var(--primary-soft)', borderRadius:8, padding:'8px 14px', fontSize:13, fontWeight:600 }}>
+              {selectedCustomer?.name || t('sales.walkIn')}
+            </div>
+          )}
+
+          {/* Inline new customer form */}
+          {showCustInput && (
+            <div style={{ marginTop:8, background:'var(--bg)', borderRadius:8, padding:12, border:'1px dashed var(--primary)' }}>
+              <div style={{ fontSize:12, color:'var(--primary)', fontWeight:600, marginBottom:8 }}>New customer</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                <input className="input" placeholder={t('sales.addCustomerName') + ' *'}
+                  value={newCustForm.name} onChange={e => setNewCustForm(f => ({...f, name: e.target.value}))} />
+                <input className="input" placeholder={t('sales.addCustomerPhone')}
+                  value={newCustForm.phone} onChange={e => setNewCustForm(f => ({...f, phone: e.target.value}))} />
+              </div>
+              <div style={{ display:'flex', gap:8, marginTop:8 }}>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setShowCustInput(false); setCustSearch(''); }}>
+                  {t('common.cancel')}
+                </button>
+                <button type="button" className="btn btn-primary btn-sm"
+                  disabled={!newCustForm.name.trim() || addCustomerMutation.isPending}
+                  onClick={() => addCustomerMutation.mutate({ name: newCustForm.name.trim(), phone: newCustForm.phone || undefined })}>
+                  {addCustomerMutation.isPending ? t('common.saving') : t('common.add')}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {form.payment_type === 'partial' && (
-          <div style={{ marginBottom:12 }}>
-            <label className="label">{t('sales.paidAmount')} ৳</label>
-            <input type="number" className="input" placeholder="0" min="0" step="0.01" max={totalAmount || undefined}
-              value={form.paid_amount} onChange={e => setForm(f => ({...f, paid_amount: e.target.value}))} />
-            {(() => {
-              const paid = parseFloat(form.paid_amount || 0);
-              const remaining = Math.round((totalAmount - paid) * 100) / 100;
-              if (paid <= 0 || totalAmount <= 0) return <div className="dim tiny" style={{ marginTop:5 }}>{t('sales.partialPaidHint')}</div>;
-              if (remaining <= 0) return <div style={{ color:'var(--success)', fontSize:12, fontWeight:600, marginTop:5 }}>{t('common.fullySettled')}</div>;
-              return <div style={{ color:'var(--accent)', fontSize:12, marginTop:5 }}>{TK(remaining)} {t('common.afterPayment')}</div>;
-            })()}
-          </div>
-        )}
+        {/* ── Sale date ────────────────────────────────────────────── */}
+        <div style={{ marginBottom:12 }}>
+          <label className="label">{t('sales.saleDate')}</label>
+          <input type="date" className="input" value={form.sale_date}
+            readOnly={isSalesman}
+            style={isSalesman ? { background:'var(--bg)', cursor:'default' } : {}}
+            onChange={e => !isSalesman && setForm(f => ({...f, sale_date: e.target.value}))} required />
+        </div>
 
-        <div style={{ marginBottom:8 }}>
+        {/* ── Items (first — user picks what they're selling) ──────── */}
+        <div style={{ marginBottom:12 }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
             <div className="section-title" style={{ fontSize:13, marginBottom:0 }}>{t('sales.items')}</div>
             {isSalesman && cylinderList.length === 0 && (
@@ -197,7 +283,7 @@ export default function QuickSaleModal({ onClose }) {
                   <input type="number" className="input" min="1" max={maxQty || undefined}
                     value={item.qty} onChange={e => setItem(i, 'qty', e.target.value)} required />
                   {isSalesman && maxQty !== '' && item.cylinder_id && (
-                    <div className="dim tiny" style={{ marginTop:3 }}>{maxQty} allocated</div>
+                    <div className="dim tiny" style={{ marginTop:3 }}>{maxQty} {t('allocation.allocated')}</div>
                   )}
                 </div>
                 <div style={{ flex:1 }}>
@@ -217,17 +303,49 @@ export default function QuickSaleModal({ onClose }) {
           <button type="button" className="btn btn-ghost btn-sm" onClick={addItem}>{t('common.addItem')}</button>
         </div>
 
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:20 }}>
-          <div>
-            <div className="dim tiny">{t('common.total')}</div>
-            <div style={{ fontSize:18, fontWeight:700, color:'var(--primary)' }}>{TK(totalAmount)}</div>
+        {/* ── Total strip (visible before choosing payment) ─────────── */}
+        {totalAmount > 0 && (
+          <div style={{ background:'var(--primary-soft)', borderRadius:8, padding:'10px 16px', marginBottom:14, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <span className="dim tiny">{t('common.total')}</span>
+            <span style={{ fontSize:18, fontWeight:700, color:'var(--primary)' }}>{TK(totalAmount)}</span>
           </div>
-          <div style={{ display:'flex', gap:8 }}>
-            <button type="button" className="btn btn-ghost" onClick={handleClose}>{t('common.cancel')}</button>
-            <button type="submit" className="btn btn-primary" disabled={mutation.isPending}>
-              {mutation.isPending ? t('sales.saving') : t('sales.recordSale')}
-            </button>
+        )}
+
+        {/* ── Payment type ─────────────────────────────────────────── */}
+        <div style={{ marginBottom:12 }}>
+          <label className="label">{t('sales.paymentType')}</label>
+          <select className="select" value={form.payment_type} onChange={e => setForm(f => ({...f, payment_type: e.target.value}))}>
+            <option value="cash">{t('status.cash')}</option>
+            <option value="due">{t('status.due')}</option>
+            <option value="partial">{t('status.partial')}</option>
+          </select>
+        </div>
+
+        {/* ── Partial amount (only when partial selected) ───────────── */}
+        {form.payment_type === 'partial' && (
+          <div style={{ marginBottom:12 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+              <label className="label" style={{ margin:0 }}>{t('sales.paidAmount')} ৳</label>
+              {totalAmount > 0 && <span className="dim tiny">Max: {TK(totalAmount)}</span>}
+            </div>
+            <input type="number" className="input" placeholder="0" min="0.01" step="0.01" max={totalAmount || undefined}
+              value={form.paid_amount} onChange={e => setForm(f => ({...f, paid_amount: e.target.value}))} />
+            {(() => {
+              const paid = parseFloat(form.paid_amount || 0);
+              const rem  = Math.round((totalAmount - paid) * 100) / 100;
+              if (paid <= 0 || totalAmount <= 0) return <div className="dim tiny" style={{ marginTop:5 }}>{t('sales.partialPaidHint')}</div>;
+              if (rem  <= 0) return <div style={{ color:'var(--success)', fontSize:12, fontWeight:600, marginTop:5 }}>{t('common.fullySettled')}</div>;
+              return <div style={{ color:'var(--accent)', fontSize:12, marginTop:5 }}>{TK(rem)} {t('common.afterPayment')}</div>;
+            })()}
           </div>
+        )}
+
+        {/* ── Footer ───────────────────────────────────────────────── */}
+        <div style={{ display:'flex', justifyContent:'flex-end', gap:8, marginTop:20 }}>
+          <button type="button" className="btn btn-ghost" onClick={handleClose}>{t('common.cancel')}</button>
+          <button type="submit" className="btn btn-primary" disabled={saleMutation.isPending}>
+            {saleMutation.isPending ? t('sales.saving') : t('sales.recordSale')}
+          </button>
         </div>
       </form>
     </Modal>

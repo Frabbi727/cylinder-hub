@@ -10,13 +10,18 @@ use Illuminate\Pagination\LengthAwarePaginator;
 
 class SaleRepository implements SaleRepositoryInterface
 {
-    public function paginate(int $perPage = 15, ?User $user = null): LengthAwarePaginator
+    public function paginate(int $perPage = 15, ?User $user = null, bool $todayOnly = false): LengthAwarePaginator
     {
         $query = Sale::with(['customer', 'salesman', 'items.cylinder'])
-            ->orderByDesc('sale_date');
+            ->orderByDesc('sale_date')
+            ->orderByDesc('created_at');
 
         if ($user?->isSalesman()) {
             $query->where('salesman_id', $user->id);
+        }
+
+        if ($todayOnly) {
+            $query->whereDate('sale_date', today());
         }
 
         return $query->paginate($perPage);

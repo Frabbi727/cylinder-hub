@@ -29,12 +29,18 @@ export function useInventory() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => cylinderService.update(id, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['cylinders'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cylinders'] });
+      qc.invalidateQueries({ queryKey: ['stock'] });
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: cylinderService.remove,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['cylinders'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cylinders'] });
+      qc.invalidateQueries({ queryKey: ['stock'] });
+    },
   });
 
   // Enrich stock data with cylinder info
@@ -57,9 +63,12 @@ export function useInventory() {
     tab, setTab,
     showAddCylinder, setShowAddCylinder,
     createCylinder: createMutation.mutate,
+    isCreating:     createMutation.isPending,
+    createError:    createMutation.error,
     updateCylinder: updateMutation.mutate,
+    isUpdating:     updateMutation.isPending,
+    updateError:    updateMutation.error,
     deleteCylinder: deleteMutation.mutate,
-    isCreating: createMutation.isPending,
-    createError: createMutation.error,
+    isDeleting:     deleteMutation.isPending,
   };
 }

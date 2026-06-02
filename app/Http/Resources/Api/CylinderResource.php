@@ -25,6 +25,9 @@ class CylinderResource extends JsonResource
                 'empty_qty'  => $this->stock->empty_qty,
                 'capacity'   => $this->stock->capacity,
             ]),
+            'fifo_cost'    => $this->whenLoaded('firstFifoItem', fn () =>
+                $this->firstFifoItem ? (float) $this->firstFifoItem->unit_cost : null
+            ),
         ];
     }
 }

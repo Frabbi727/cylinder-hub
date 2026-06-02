@@ -10,7 +10,7 @@ class CylinderRepository implements CylinderRepositoryInterface
 {
     public function all(): Collection
     {
-        return Cylinder::with('stock')->get();
+        return Cylinder::with('stock', 'firstFifoItem')->get();
     }
 
     public function allActive(): Collection

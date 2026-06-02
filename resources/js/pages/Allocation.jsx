@@ -206,42 +206,76 @@ export default function Allocation() {
       </div>
 
       {/* ALLOCATE MODAL */}
-      {showAllocate && selectedSalesman && (
-        <Modal title={`${t('allocation.allocateStock')} — ${selectedSalesman.name}`} onClose={() => setShowAllocate(false)}>
-          <ErrorBanner error={allocateError} />
-          <form onSubmit={e => { e.preventDefault(); allocate({ salesmanId: selectedSalesman.id, data: allocForm }); }}>
-            <div style={{ marginBottom:16 }}>
-              <label className="label">{t('inventory.cylinderTypes')} *</label>
-              <select className="select" value={allocForm.cylinder_id} onChange={e => setAllocForm(f => ({...f, cylinder_id: e.target.value}))} required>
-                <option value="">Select...</option>
-                {cylinders.map(c => (
-                  <option key={c.id} value={c.id} disabled={(c.stock?.filled_qty||0)===0}>
-                    {c.name} {c.size} — {c.stock?.filled_qty||0} {t('allocation.availableFilled')}
-                    {(c.stock?.filled_qty||0)===0 ? ` (${t('allocation.outOfStock')})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16 }}>
-              <div>
-                <label className="label">{t('common.qty')} *</label>
-                <input type="number" className="input" min="1" value={allocForm.qty} onChange={e => setAllocForm(f => ({...f, qty: e.target.value}))} required />
+      {showAllocate && selectedSalesman && (() => {
+        const selectedCyl = cylinders.find(c => String(c.id) === String(allocForm.cylinder_id));
+        const fifoCost    = selectedCyl?.fifo_cost ?? null;
+        const salePrice   = parseFloat(allocForm.sale_price) || 0;
+        const diff        = fifoCost !== null && salePrice > 0 ? salePrice - fifoCost : null;
+        const isLoss      = diff !== null && diff < 0;
+        const isBreakEven = diff !== null && diff === 0;
+        return (
+          <Modal title={`${t('allocation.allocateStock')} — ${selectedSalesman.name}`} onClose={() => setShowAllocate(false)}>
+            <ErrorBanner error={allocateError} />
+            <form onSubmit={e => { e.preventDefault(); allocate({ salesmanId: selectedSalesman.id, data: allocForm }); }}>
+              <div style={{ marginBottom:16 }}>
+                <label className="label">{t('inventory.cylinderTypes')} *</label>
+                <select className="select" value={allocForm.cylinder_id} onChange={e => setAllocForm(f => ({...f, cylinder_id: e.target.value, sale_price: ''}))} required>
+                  <option value="">Select...</option>
+                  {cylinders.map(c => (
+                    <option key={c.id} value={c.id} disabled={(c.stock?.filled_qty||0)===0}>
+                      {c.name} {c.size} — {c.stock?.filled_qty||0} {t('allocation.availableFilled')}
+                      {(c.stock?.filled_qty||0)===0 ? ` (${t('allocation.outOfStock')})` : ''}
+                    </option>
+                  ))}
+                </select>
+                {fifoCost !== null && (
+                  <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:6 }}>
+                    <span style={{ fontSize:11, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'0.04em' }}>{t('allocation.fifoCost')}:</span>
+                    <span style={{ fontSize:13, fontWeight:700, color:'var(--primary)' }}>৳{Number(fifoCost).toLocaleString('en-US')}</span>
+                  </div>
+                )}
               </div>
-              <div>
-                <label className="label">{t('allocation.salePrice')} *</label>
-                <input type="number" className="input" min="0.01" step="0.01" placeholder="e.g. 1200"
-                  value={allocForm.sale_price} onChange={e => setAllocForm(f => ({...f, sale_price: e.target.value}))} required />
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom: isLoss || isBreakEven ? 8 : 16 }}>
+                <div>
+                  <label className="label">{t('common.qty')} *</label>
+                  <input type="number" className="input" min="1" value={allocForm.qty} onChange={e => setAllocForm(f => ({...f, qty: e.target.value}))} required />
+                </div>
+                <div>
+                  <label className="label">{t('allocation.salePrice')} *</label>
+                  <input type="number" className="input" min="0.01" step="0.01" placeholder="e.g. 1200"
+                    style={ isLoss ? { borderColor:'var(--error)', outline:'none', boxShadow:'0 0 0 2px var(--error-bg)' } : {} }
+                    value={allocForm.sale_price} onChange={e => setAllocForm(f => ({...f, sale_price: e.target.value}))} required />
+                  {diff !== null && salePrice > 0 && !isLoss && !isBreakEven && (
+                    <div style={{ fontSize:11, color:'var(--success)', marginTop:4 }}>
+                      +{TK(diff)} {t('allocation.profitHint').replace('{{amount}}', '')}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-            <div style={{ display:'flex', justifyContent:'flex-end', gap:8, marginTop:20 }}>
-              <button type="button" className="btn btn-ghost" onClick={() => setShowAllocate(false)}>{t('common.cancel')}</button>
-              <button type="submit" className="btn btn-primary" disabled={isAllocating}>
-                {isAllocating ? t('allocation.allocating') : t('allocation.confirmAllocation')}
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
+              {isLoss && (
+                <div style={{ display:'flex', alignItems:'center', gap:8, background:'#fff5f5', border:'1px solid var(--error)', borderRadius:8, padding:'10px 14px', marginBottom:16, color:'var(--error)' }}>
+                  <AlertCircle size={16} style={{ flexShrink:0 }} />
+                  <span style={{ fontSize:13, fontWeight:500 }}>
+                    {t('allocation.lossWarning').replace('{{amount}}', TK(Math.abs(diff)))}
+                  </span>
+                </div>
+              )}
+              {isBreakEven && (
+                <div style={{ display:'flex', alignItems:'center', gap:8, background:'#fffbeb', border:'1px solid var(--warning)', borderRadius:8, padding:'10px 14px', marginBottom:16, color:'var(--warning)' }}>
+                  <AlertCircle size={16} style={{ flexShrink:0 }} />
+                  <span style={{ fontSize:13, fontWeight:500 }}>{t('allocation.breakEven')}</span>
+                </div>
+              )}
+              <div style={{ display:'flex', justifyContent:'flex-end', gap:8, marginTop:20 }}>
+                <button type="button" className="btn btn-ghost" onClick={() => setShowAllocate(false)}>{t('common.cancel')}</button>
+                <button type="submit" className="btn btn-primary" disabled={isAllocating}>
+                  {isAllocating ? t('allocation.allocating') : t('allocation.confirmAllocation')}
+                </button>
+              </div>
+            </form>
+          </Modal>
+        );
+      })()}
 
       {/* ADD SALESMAN MODAL */}
       {showAddSalesman && (

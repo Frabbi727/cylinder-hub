@@ -5,7 +5,7 @@ import CylCell    from '../components/ui/CylCell';
 import StatusPill from '../components/ui/StatusPill';
 import Modal      from '../components/ui/Modal';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
-import { Plus, Zap, AlertCircle, CreditCard } from 'lucide-react';
+import { Plus, Zap, AlertCircle, CreditCard, ChevronDown, ChevronRight } from 'lucide-react';
 
 const TK = (n) => '৳' + Number(n || 0).toLocaleString('en-US');
 const todayStr = new Date().toISOString().split('T')[0];
@@ -30,9 +30,10 @@ export default function Purchases() {
     simulation, simulateSale, simLoading,
   } = usePurchases();
 
-  const [form, setForm]   = useState(defaultForm);
-  const [simForm, setSimForm] = useState({ cylinder_id: '', qty: 1, unit_price: '' });
-  const [payForm, setPayForm] = useState({ amount: '', date: todayStr, notes: '' });
+  const [form,       setForm]       = useState(defaultForm);
+  const [simForm,    setSimForm]    = useState({ cylinder_id: '', qty: 1, unit_price: '' });
+  const [payForm,    setPayForm]    = useState({ amount: '', date: todayStr, notes: '' });
+  const [expandedId, setExpandedId] = useState(null); // which purchase row is expanded
 
   const setItem = (i, field, val) => {
     const items = [...form.items];
@@ -142,14 +143,14 @@ export default function Purchases() {
         <table className="tbl" style={{ width:'100%' }}>
           <thead>
             <tr>
-              <th>#</th>
+              <th style={{ width:32 }}></th>
               <th>{t('common.date')}</th>
               <th>{t('purchases.supplier')}</th>
               <th>{t('common.qty')}</th>
-              <th>{t('common.total')}</th>
-              <th>{t('common.paid')}</th>
-              <th>{t('common.due')}</th>
-              <th>{t('common.status')}</th>
+              <th style={{ textAlign:'right' }}>{t('common.total')}</th>
+              <th style={{ textAlign:'right' }}>{t('common.paid')}</th>
+              <th style={{ textAlign:'right' }}>{t('common.due')}</th>
+              <th title="FIFO lot consumption status">{t('purchases.lotStatus')}</th>
               <th></th>
             </tr>
           </thead>
@@ -157,27 +158,114 @@ export default function Purchases() {
             {purchases.length === 0 && (
               <tr><td colSpan={9} style={{ textAlign:'center', padding:40 }} className="dim">{t('purchases.noPurchases')}</td></tr>
             )}
-            {purchases.map(p => (
-              <tr key={p.id}>
-                <td className="dim tiny">#{p.id}</td>
-                <td>{p.purchase_date}</td>
-                <td style={{ fontWeight:600 }}>{p.supplier?.name}</td>
-                <td>{p.items?.reduce((s, it) => s + it.qty, 0)} {t('common.pcs')}</td>
-                <td style={{ fontWeight:600 }}>{TK(p.total_amount)}</td>
-                <td style={{ color:'var(--success)' }}>{TK(p.paid_amount)}</td>
-                <td style={{ color: p.due_amount > 0 ? 'var(--accent)' : 'inherit', fontWeight: p.due_amount > 0 ? 700 : 400 }}>
-                  {TK(p.due_amount)}
-                </td>
-                <td>{p.items?.map((it, i) => <StatusPill key={i} status={it.status} />)}</td>
-                <td>
-                  {p.due_amount > 0 && (
-                    <button className="btn btn-soft btn-sm" onClick={() => openPay(p)}>
-                      <CreditCard size={13} /> {t('purchases.payBalance')}
-                    </button>
+            {purchases.map(p => {
+              const isExpanded = expandedId === p.id;
+              return (
+                <React.Fragment key={p.id}>
+                  {/* ── Summary row ── */}
+                  <tr
+                    style={{ cursor:'pointer' }}
+                    onClick={() => setExpandedId(isExpanded ? null : p.id)}
+                  >
+                    <td style={{ color:'var(--text-3)', paddingRight:0 }}>
+                      {isExpanded
+                        ? <ChevronDown size={15} />
+                        : <ChevronRight size={15} />}
+                    </td>
+                    <td className="dim tiny">{p.purchase_date}</td>
+                    <td style={{ fontWeight:600 }}>{p.supplier?.name}</td>
+                    <td>{p.items?.reduce((s, it) => s + it.qty, 0)} {t('common.pcs')}</td>
+                    <td style={{ fontWeight:600, textAlign:'right' }}>{TK(p.total_amount)}</td>
+                    <td style={{ color:'var(--success)', textAlign:'right' }}>{TK(p.paid_amount)}</td>
+                    <td style={{ color: p.due_amount > 0 ? 'var(--accent)' : 'inherit', fontWeight: p.due_amount > 0 ? 700 : 400, textAlign:'right' }}>
+                      {TK(p.due_amount)}
+                    </td>
+                    <td>
+                      {p.items?.map((it, i) => (
+                        <div key={i} style={{ display:'flex', alignItems:'center', gap:6, marginBottom: i < p.items.length - 1 ? 3 : 0 }}>
+                          <StatusPill status={it.status} />
+                          <span className="dim tiny">{it.cylinder?.name} {it.cylinder?.size}</span>
+                        </div>
+                      ))}
+                    </td>
+                    <td onClick={e => e.stopPropagation()}>
+                      {p.due_amount > 0 && (
+                        <button className="btn btn-soft btn-sm" onClick={() => openPay(p)}>
+                          <CreditCard size={13} /> {t('purchases.payBalance')}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+
+                  {/* ── Expanded detail row ── */}
+                  {isExpanded && (
+                    <tr>
+                      <td colSpan={9} style={{ padding:0, background:'var(--bg)', borderTop:'none' }}>
+                        <div style={{ padding:'12px 16px 16px 48px' }}>
+                          <div className="dim tiny" style={{ marginBottom:8, textTransform:'uppercase', letterSpacing:'0.06em' }}>
+                            {t('purchases.title')} #{p.id} — {t('common.date')}: {p.purchase_date} · {t('purchases.supplier')}: {p.supplier?.name}
+                          </div>
+                          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+                            <thead>
+                              <tr style={{ borderBottom:'1px solid var(--border-soft)' }}>
+                                <th style={{ textAlign:'left', padding:'6px 10px', fontWeight:600, color:'var(--text-2)', fontSize:12 }}>Lot #</th>
+                                <th style={{ textAlign:'left', padding:'6px 10px', fontWeight:600, color:'var(--text-2)', fontSize:12 }}>{t('inventory.cylinderTypes')}</th>
+                                <th style={{ textAlign:'right', padding:'6px 10px', fontWeight:600, color:'var(--text-2)', fontSize:12 }}>{t('purchases.unitCost')}</th>
+                                <th style={{ textAlign:'right', padding:'6px 10px', fontWeight:600, color:'var(--text-2)', fontSize:12 }}>{t('common.qty')}</th>
+                                <th style={{ textAlign:'right', padding:'6px 10px', fontWeight:600, color:'var(--text-2)', fontSize:12 }}>{t('allocation.remaining')}</th>
+                                <th style={{ textAlign:'right', padding:'6px 10px', fontWeight:600, color:'var(--text-2)', fontSize:12 }}>{t('common.total')}</th>
+                                <th style={{ textAlign:'center', padding:'6px 10px', fontWeight:600, color:'var(--text-2)', fontSize:12 }}>{t('purchases.lotStatus')}</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {p.items?.map((it, i) => (
+                                <tr key={i} style={{ borderBottom:'1px solid var(--border-soft)' }}>
+                                  <td style={{ padding:'8px 10px', fontWeight:700, color:'var(--primary)', fontFamily:'monospace' }}>
+                                    L-{it.id}
+                                  </td>
+                                  <td style={{ padding:'8px 10px' }}>
+                                    <div style={{ fontWeight:600 }}>{it.cylinder?.name}</div>
+                                    <div className="dim tiny">{it.cylinder?.size}</div>
+                                  </td>
+                                  <td style={{ padding:'8px 10px', textAlign:'right', fontWeight:600 }}>{TK(it.unit_cost)}</td>
+                                  <td style={{ padding:'8px 10px', textAlign:'right' }}>{it.qty} {t('common.pcs')}</td>
+                                  <td style={{ padding:'8px 10px', textAlign:'right',
+                                    color: it.remaining_qty === 0 ? 'var(--text-3)' : it.remaining_qty < it.qty ? 'var(--warning)' : 'inherit',
+                                    fontWeight: it.remaining_qty > 0 ? 600 : 400 }}>
+                                    {it.remaining_qty} {t('common.pcs')}
+                                  </td>
+                                  <td style={{ padding:'8px 10px', textAlign:'right', fontWeight:600 }}>
+                                    {TK(it.qty * it.unit_cost)}
+                                  </td>
+                                  <td style={{ padding:'8px 10px', textAlign:'center' }}>
+                                    <StatusPill status={it.status} />
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot>
+                              <tr style={{ background:'var(--primary-soft)' }}>
+                                <td colSpan={3} style={{ padding:'8px 10px', fontWeight:600, fontSize:12 }}>{t('common.total')}</td>
+                                <td style={{ padding:'8px 10px', textAlign:'right', fontWeight:700 }}>
+                                  {p.items?.reduce((s, it) => s + it.qty, 0)} {t('common.pcs')}
+                                </td>
+                                <td style={{ padding:'8px 10px', textAlign:'right', fontWeight:700, color:'var(--primary)' }}>
+                                  {p.items?.reduce((s, it) => s + it.remaining_qty, 0)} {t('common.pcs')}
+                                </td>
+                                <td style={{ padding:'8px 10px', textAlign:'right', fontWeight:700, color:'var(--primary)' }}>
+                                  {TK(p.total_amount)}
+                                </td>
+                                <td></td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      </td>
+                    </tr>
                   )}
-                </td>
-              </tr>
-            ))}
+                </React.Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>

@@ -29,8 +29,13 @@ Route::prefix('v1')->group(function () {
         Route::get('sales/{sale}',      [SaleController::class, 'show']);
         Route::post('sales/{sale}/pay', [SaleController::class, 'pay']);
 
-        // Customer read — salesman needs this to select a customer during Quick Sale
-        Route::get('customers', [CustomerController::class, 'index']);
+        // Cylinders read — salesman needs this for empty-return dropdown (any type)
+        Route::get('cylinders',           [CylinderController::class, 'index']);
+        Route::get('cylinders/{cylinder}',[CylinderController::class, 'show']);
+
+        // Customers — salesman needs read + create for inline quick-add during sale
+        Route::get('customers',  [CustomerController::class, 'index']);
+        Route::post('customers', [CustomerController::class, 'store']);
 
         // Salesman self-service: view own allocation data + reconcile own allocation
         Route::get('salesmen/{user}',                     [SalesmanController::class, 'show']);
@@ -44,9 +49,7 @@ Route::prefix('v1')->group(function () {
 
             Route::get('dashboard', [DashboardController::class, 'index']);
 
-            // Cylinders
-            Route::get('cylinders',               [CylinderController::class, 'index']);
-            Route::get('cylinders/{cylinder}',    [CylinderController::class, 'show']);
+            // Cylinders write (read is available to all)
             Route::post('cylinders',              [CylinderController::class, 'store']);
             Route::put('cylinders/{cylinder}',    [CylinderController::class, 'update']);
             Route::delete('cylinders/{cylinder}', [CylinderController::class, 'destroy']);
@@ -62,8 +65,7 @@ Route::prefix('v1')->group(function () {
             // Sales admin actions
             Route::delete('sales/{sale}', [SaleController::class, 'destroy']);
 
-            // Customer management
-            Route::post('customers',                    [CustomerController::class, 'store']);
+            // Customer management (read + create are available to all; write/delete admin only)
             Route::get('customers/{customer}',          [CustomerController::class, 'show']);
             Route::put('customers/{customer}',          [CustomerController::class, 'update']);
             Route::delete('customers/{customer}',       [CustomerController::class, 'destroy']);
@@ -91,10 +93,9 @@ Route::prefix('v1')->group(function () {
             Route::put('expenses/{expense}',   [ExpenseController::class, 'update']);
             Route::delete('expenses/{expense}',[ExpenseController::class, 'destroy']);
 
-            // Stock & returns
-            Route::get('stock',    [StockController::class, 'index']);
-            Route::get('returns',  [StockController::class, 'returns']);
-            Route::post('returns', [StockController::class, 'storeReturn']);
+            // Stock & returns (POST /returns is accessible to all in the outer group)
+            Route::get('stock',   [StockController::class, 'index']);
+            Route::get('returns', [StockController::class, 'returns']);
         });
     });
 });

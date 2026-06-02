@@ -12,16 +12,18 @@ import Customers from '../pages/Customers';
 import Suppliers from '../pages/Suppliers';
 import Expenses from '../pages/Expenses';
 
+// Redirects unauthenticated users to login
 function ProtectedRoute({ children }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
   return children;
 }
 
+// Redirects non-admins to their home (/sales); also redirects unauthenticated to login
 function AdminRoute({ children }) {
   const { user } = useAuth();
-  if (!user) return <Navigate to="/login" replace />;
-  if (user.role !== 'admin') return <Navigate to="/sales" replace />;
+  if (!user)                   return <Navigate to="/login" replace />;
+  if (user.role !== 'admin')   return <Navigate to="/sales"  replace />;
   return children;
 }
 

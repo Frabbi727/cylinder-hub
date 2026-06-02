@@ -9,7 +9,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 
 interface SaleRepositoryInterface
 {
-    public function paginate(int $perPage = 15, ?User $user = null): LengthAwarePaginator;
+    public function paginate(int $perPage = 15, ?User $user = null, bool $todayOnly = false): LengthAwarePaginator;
     public function findById(int $id): ?Sale;
     public function create(array $data): Sale;
     public function delete(Sale $sale): void;

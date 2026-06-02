@@ -1,33 +1,46 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { saleService } from '../services/saleService';
-import { cylinderService } from '../services/cylinderService';
-import { customerService } from '../services/customerService';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+
+const todayStr = new Date().toISOString().split('T')[0];
 
 export function useSales() {
   const qc = useQueryClient();
-  const [showAdd,     setShowAdd]     = useState(false);
-  const [payTarget,   setPayTarget]   = useState(null); // sale to pay balance on
+  const [payTarget, setPayTarget] = useState(null);
 
-  const { data: sales, isLoading } = useQuery({
+  // All sales (for the All Sales tab and admin view)
+  const { data: allSalesData, isLoading } = useQuery({
     queryKey: ['sales'],
     queryFn:  () => saleService.getAll(),
   });
 
-  const { data: cylinders } = useQuery({
-    queryKey: ['cylinders'],
-    queryFn:  cylinderService.getAll,
+  // Today's sales only (for the Today tab)
+  const { data: todaySalesData, isLoading: isTodayLoading } = useQuery({
+    queryKey: ['sales-today'],
+    queryFn:  () => saleService.getAll(1, true),
+    refetchInterval: 30_000,
   });
 
-  const { data: customers } = useQuery({
-    queryKey: ['customers'],
-    queryFn:  () => customerService.getAll(),
-  });
+  const allSales   = allSalesData?.data  || [];
+  const todaySales = todaySalesData?.data || [];
+
+  // Computed: outstanding dues (all unpaid across history)
+  const outstandingDues = useMemo(
+    () => allSales.filter(s => s.due_amount > 0),
+    [allSales]
+  );
+
+  // Computed: today's cash collected (sum of paid_amount from today's sales)
+  const todayCashCollected = useMemo(
+    () => todaySales.reduce((sum, s) => sum + parseFloat(s.paid_amount || 0), 0),
+    [todaySales]
+  );
 
   const deleteMutation = useMutation({
     mutationFn: saleService.remove,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sales'] });
+      qc.invalidateQueries({ queryKey: ['sales-today'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
       qc.invalidateQueries({ queryKey: ['stock'] });
     },
@@ -37,19 +50,21 @@ export function useSales() {
     mutationFn: ({ id, data }) => saleService.payBalance(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sales'] });
+      qc.invalidateQueries({ queryKey: ['sales-today'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
       qc.invalidateQueries({ queryKey: ['customers'] });
+      qc.invalidateQueries({ queryKey: ['my-allocations'] });
       setPayTarget(null);
     },
   });
 
   return {
-    sales:     sales?.data || [],
-    meta:      sales?.meta,
-    isLoading,
-    cylinders: Array.isArray(cylinders) ? cylinders : (cylinders?.data || []),
-    customers: customers?.data || [],
-    showAdd, setShowAdd,
+    sales:              allSales,
+    todaySales,
+    outstandingDues,
+    todayCashCollected,
+    meta:               allSalesData?.meta,
+    isLoading:          isLoading || isTodayLoading,
     payTarget, setPayTarget,
     deleteSale:  deleteMutation.mutate,
     isDeleting:  deleteMutation.isPending,

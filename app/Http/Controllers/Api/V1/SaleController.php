@@ -21,9 +21,10 @@ class SaleController extends Controller
         private SaleService $saleService,
     ) {}
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return response()->json($this->sales->paginate(auth()->user()));
+        $todayOnly = $request->boolean('today');
+        return response()->json($this->sales->paginate(auth()->user(), $todayOnly));
     }
 
     public function store(StoreSaleRequest $request): JsonResponse
