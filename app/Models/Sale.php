@@ -20,6 +20,8 @@ class Sale extends Model
     {
         return [
             'sale_date'    => 'date:Y-m-d',
+            'salesman_id'  => 'integer',
+            'customer_id'  => 'integer',
             'total_amount' => 'decimal:2',
             'paid_amount'  => 'decimal:2',
         ];

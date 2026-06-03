@@ -49,7 +49,7 @@ class SaleController extends Controller
 
     public function show(Sale $sale): JsonResponse
     {
-        if (auth()->user()->isSalesman() && $sale->salesman_id !== auth()->id()) {
+        if (auth()->user()->isSalesman() && (int) $sale->salesman_id !== (int) auth()->id()) {
             abort(403, 'Access denied.');
         }
 
@@ -76,7 +76,7 @@ class SaleController extends Controller
 
     public function pay(Request $request, Sale $sale): JsonResponse
     {
-        if (auth()->user()->isSalesman() && $sale->salesman_id !== auth()->id()) {
+        if (auth()->user()->isSalesman() && (int) $sale->salesman_id !== (int) auth()->id()) {
             abort(403, 'You can only collect payment for your own sales.');
         }
 

@@ -36,7 +36,7 @@ class SalesmanController extends Controller
 
     public function show(User $user): JsonResponse
     {
-        if (auth()->user()->isSalesman() && $user->id !== auth()->id()) {
+        if (auth()->user()->isSalesman() && (int) $user->id !== (int) auth()->id()) {
             abort(403, 'Access denied.');
         }
 
@@ -153,7 +153,7 @@ class SalesmanController extends Controller
 
     public function report(Request $request, User $user): JsonResponse
     {
-        if (auth()->user()->isSalesman() && $user->id !== auth()->id()) {
+        if (auth()->user()->isSalesman() && (int) $user->id !== (int) auth()->id()) {
             abort(403, 'Access denied.');
         }
 
