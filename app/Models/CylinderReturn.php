@@ -9,6 +9,7 @@ class CylinderReturn extends Model
     protected $fillable = [
         'sale_id', 'customer_id', 'cylinder_id', 'recorded_by',
         'qty', 'type', 'return_date', 'notes',
+        'is_extra', 'extra_reason', 'is_verified',
     ];
 
     protected function casts(): array

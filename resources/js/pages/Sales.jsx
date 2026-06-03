@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useSales } from '../hooks/useSales';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -92,13 +92,19 @@ function SalesTable({ rows, isSalesman, isAdmin, onPay, onDelete, isDeleting, t 
 export default function Sales() {
   const { t } = useTranslation();
   const { user, isAdmin, isSalesman } = useAuth();
-  const qc = useQueryClient();
+  const qc       = useQueryClient();
+  const navigate = useNavigate();
+
+  const [filterFrom, setFilterFrom]         = useState('');
+  const [filterTo, setFilterTo]             = useState('');
+  const [filterPayment, setFilterPayment]   = useState('');
+  const [filterSearch, setFilterSearch]     = useState('');
 
   const {
     sales, todaySales, outstandingDues, todayCashCollected,
     isLoading, deleteSale, isDeleting,
     payTarget, setPayTarget, payBalance, isPaying, payError,
-  } = useSales();
+  } = useSales({ from: filterFrom || undefined, to: filterTo || undefined, payment_type: filterPayment || undefined, search: filterSearch || undefined });
 
   const [activeTab,    setActiveTab]    = useState('today');   // 'today' | 'all' | 'dues'
   const [payForm,      setPayForm]      = useState({ amount: '', date: todayStr, notes: '' });
@@ -362,23 +368,37 @@ export default function Sales() {
               <span style={{ color:'var(--success)' }}>{t('common.paid')}: <strong>{TK(todaySales.reduce((s,x) => s+parseFloat(x.paid_amount||0),0))}</strong></span>
               <span style={{ color:'var(--accent)' }}>{t('common.due')}: <strong>{TK(todaySales.reduce((s,x) => s+parseFloat(x.due_amount||0),0))}</strong></span>
             </div>
-            {todaySales.map(s => <SaleCard key={s.id} sale={s} onPay={openPay} t={t} />)}
+            {todaySales.map(s => <SaleCard key={s.id} sale={s} onPay={openPay} t={t} onView={() => navigate(`/sales/${s.id}`)} />)}
           </>
         )
       )}
 
-      {/* All sales tab */}
+      {/* All sales tab — with filter bar */}
       {activeTab === 'all' && (
-        sales.length === 0
-          ? <div className="card" style={{ textAlign:'center', padding:32, color:'var(--text-3)' }}>{t('sales.noSales')}</div>
-          : sales.map(s => <SaleCard key={s.id} sale={s} onPay={openPay} t={t} />)
+        <>
+          <div style={{ display:'flex', gap:8, marginBottom:14, flexWrap:'wrap' }}>
+            <input type="date" className="input" style={{ width:145 }} value={filterFrom} onChange={e => setFilterFrom(e.target.value)} placeholder="From" />
+            <input type="date" className="input" style={{ width:145 }} value={filterTo} onChange={e => setFilterTo(e.target.value)} placeholder="To" />
+            <select className="select" style={{ width:'auto' }} value={filterPayment} onChange={e => setFilterPayment(e.target.value)}>
+              <option value="">All types</option>
+              <option value="cash">Cash</option>
+              <option value="partial">Partial</option>
+              <option value="due">Due</option>
+            </select>
+            <input className="input" style={{ flex:1, minWidth:150 }} placeholder="Search customer..." value={filterSearch} onChange={e => setFilterSearch(e.target.value)} />
+          </div>
+          {sales.length === 0
+            ? <div className="card" style={{ textAlign:'center', padding:32, color:'var(--text-3)' }}>{t('sales.noSales')}</div>
+            : sales.map(s => <SaleCard key={s.id} sale={s} onPay={openPay} t={t} onView={() => navigate(`/sales/${s.id}`)} />)
+          }
+        </>
       )}
 
       {/* Outstanding dues tab */}
       {activeTab === 'dues' && (
         outstandingDues.length === 0
           ? <div className="card" style={{ textAlign:'center', padding:32, color:'var(--text-3)' }}>{t('sales.noDuesToday')}</div>
-          : outstandingDues.map(s => <SaleCard key={s.id} sale={s} onPay={openPay} t={t} highlight />)
+          : outstandingDues.map(s => <SaleCard key={s.id} sale={s} onPay={openPay} t={t} highlight onView={() => navigate(`/sales/${s.id}`)} />)
       )}
 
       {/* ── Collect payment modal ─────────────────────────────────── */}
@@ -513,16 +533,17 @@ export default function Sales() {
 }
 
 /* ── Sale card (salesman list view) ────────────────────────────── */
-function SaleCard({ sale, onPay, t, highlight }) {
+function SaleCard({ sale, onPay, t, highlight, onView }) {
   const TK = (n) => '৳' + Number(n || 0).toLocaleString('en-US');
   const items = sale.items || [];
   return (
-    <div className="card" style={{ padding:16, marginBottom:10, borderLeft: highlight && sale.due_amount > 0 ? '3px solid var(--accent)' : undefined }}>
+    <div className="card" style={{ padding:16, marginBottom:10, borderLeft: highlight && sale.due_amount > 0 ? '3px solid var(--accent)' : undefined, cursor: onView ? 'pointer' : undefined }}
+      onClick={onView}>
       {/* Header */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
         <div>
           <div style={{ fontWeight:700, fontSize:15 }}>{sale.customer?.name || t('sales.walkIn')}</div>
-          <div className="dim tiny">{sale.sale_date}</div>
+          <div className="dim tiny">#{sale.id} · {sale.sale_date}</div>
         </div>
         <StatusPill status={sale.payment_type} />
       </div>
@@ -551,7 +572,8 @@ function SaleCard({ sale, onPay, t, highlight }) {
           <span style={{ fontSize:12, color:'var(--accent)', fontWeight:700 }}>{t('common.due')}: {TK(sale.due_amount)}</span>
         )}
         {sale.due_amount > 0 && (
-          <button className="btn btn-soft btn-sm" style={{ marginLeft:'auto' }} onClick={() => onPay(sale)}>
+          <button className="btn btn-soft btn-sm" style={{ marginLeft:'auto' }}
+            onClick={e => { e.stopPropagation(); onPay(sale); }}>
             <CreditCard size={13} /> {t('sales.collectBalance')} {TK(sale.due_amount)}
           </button>
         )}

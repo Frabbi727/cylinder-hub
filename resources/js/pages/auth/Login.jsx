@@ -14,7 +14,7 @@ export default function Login() {
 
   // Redirect already-authenticated users to their home page
   if (user) {
-    return <Navigate to={user.role === 'admin' ? '/' : '/sales'} replace />;
+    return <Navigate to={user.role === 'admin' ? '/' : '/dashboard'} replace />;
   }
 
   const handleSubmit = async (e) => {
@@ -23,7 +23,7 @@ export default function Login() {
     try {
       const data = await login(form);
       // Navigate to role-appropriate home immediately — no double redirect
-      navigate(data.user.role === 'admin' ? '/' : '/sales', { replace: true });
+      navigate(data.user.role === 'admin' ? '/' : '/dashboard', { replace: true });
     } catch (err) {
       setError(err.response?.data?.message || t('auth.invalidCredentials'));
     }

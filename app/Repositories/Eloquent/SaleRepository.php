@@ -10,7 +10,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 
 class SaleRepository implements SaleRepositoryInterface
 {
-    public function paginate(int $perPage = 15, ?User $user = null, bool $todayOnly = false): LengthAwarePaginator
+    public function paginate(?User $user = null, bool $todayOnly = false, array $filters = []): LengthAwarePaginator
     {
         $query = Sale::with(['customer', 'salesman', 'items.cylinder'])
             ->orderByDesc('sale_date')
@@ -24,7 +24,23 @@ class SaleRepository implements SaleRepositoryInterface
             $query->whereDate('sale_date', today());
         }
 
-        return $query->paginate($perPage);
+        if (! empty($filters['from'])) {
+            $query->whereDate('sale_date', '>=', $filters['from']);
+        }
+        if (! empty($filters['to'])) {
+            $query->whereDate('sale_date', '<=', $filters['to']);
+        }
+        if (! empty($filters['payment_type']) && $filters['payment_type'] !== 'all') {
+            $query->where('payment_type', $filters['payment_type']);
+        }
+        if (! empty($filters['search'])) {
+            $query->whereHas('customer', fn ($q) => $q->where('name', 'like', '%'.$filters['search'].'%'));
+        }
+        if (! empty($filters['has_due'])) {
+            $query->whereRaw('(total_amount - paid_amount) > 0');
+        }
+
+        return $query->paginate(20);
     }
 
     public function findById(int $id): ?Sale

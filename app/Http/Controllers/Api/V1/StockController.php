@@ -36,29 +36,33 @@ class StockController extends Controller
     public function storeReturn(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'cylinder_id' => 'required|integer|exists:cylinders,id',
-            'qty'         => 'required|integer|min:1',
-            'type'        => 'required|in:empty_return,error_correction',
-            'return_date' => 'required|date',
-            'customer_id' => 'nullable|integer|exists:customers,id',
-            'sale_id'     => 'nullable|integer|exists:sales,id',
-            'notes'       => 'nullable|string',
+            'cylinder_id'  => 'required|integer|exists:cylinders,id',
+            'qty'          => 'required|integer|min:1',
+            'type'         => 'required|in:empty_return,error_correction',
+            'return_date'  => 'required|date',
+            'customer_id'  => 'nullable|integer|exists:customers,id',
+            'sale_id'      => 'nullable|integer|exists:sales,id',
+            'notes'        => 'nullable|string',
+            'is_extra'     => 'nullable|boolean',
+            'extra_reason' => 'nullable|string|max:100',
         ]);
 
         $data['recorded_by'] = auth()->id();
+        $data['is_extra']    = $data['is_extra'] ?? false;
         $return              = CylinderReturn::create($data);
 
         if ($data['type'] === 'empty_return') {
             $this->stockService->addEmptyStock($data['cylinder_id'], $data['qty']);
         }
 
+        $label = $data['is_extra'] ? 'Extra empty return' : 'Empty return';
         $this->movements->record(
             $data['cylinder_id'],
             'cylinder_return',
             $data['qty'],
             auth()->id(),
             $return->id,
-            "Empty return #{$return->id} — {$data['qty']} cylinders received from customer"
+            "{$label} #{$return->id} — {$data['qty']} cylinders received from customer"
         );
 
         return $this->created($return->load(['cylinder', 'customer']), 'Return recorded.');

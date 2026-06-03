@@ -105,12 +105,14 @@ export default function NewSale() {
   /* ── Mutations ─────────────────────────────────────────────────── */
   const saleMutation = useMutation({
     mutationFn: saleService.create,
-    onSuccess: () => {
+    onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['sales'] });
       qc.invalidateQueries({ queryKey: ['sales-today'] });
       qc.invalidateQueries({ queryKey: ['my-allocations'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
-      navigate('/sales');
+      qc.invalidateQueries({ queryKey: ['sales-dues'] });
+      const saleId = res?.data?.sale?.id || res?.data?.id;
+      navigate(saleId ? `/sales/${saleId}` : '/sales');
     },
     onError: (e) => setError(e.response?.data?.message || 'Failed to record sale'),
   });
@@ -145,7 +147,7 @@ export default function NewSale() {
   const handleCancel = () => {
     const hasData = form.items.some(it => it.cylinder_id) || form.customer_id;
     if (hasData && !window.confirm(t('sales.confirmLeave'))) return;
-    navigate('/sales');
+    navigate(isSalesman ? '/dashboard' : '/sales');
   };
 
   const handleSubmit = (e) => {
@@ -173,7 +175,7 @@ export default function NewSale() {
       {/* Back link */}
       <div style={{ marginBottom: 16 }}>
         <button className="btn btn-ghost btn-sm" onClick={handleCancel}>
-          <ChevronLeft size={15} /> {t('sales.myDay')}
+          <ChevronLeft size={15} /> {isSalesman ? 'Dashboard' : t('sales.myDay')}
         </button>
       </div>
 

@@ -146,6 +146,10 @@ class SalesmanController extends Controller
 
     public function report(Request $request, User $user): JsonResponse
     {
+        if (auth()->user()->isSalesman() && $user->id !== auth()->id()) {
+            abort(403, 'Access denied.');
+        }
+
         [$from, $to] = $this->resolvePeriod($request);
         return $this->success($this->reports->salesmanReport($user->id, $from, $to));
     }

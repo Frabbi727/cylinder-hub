@@ -50,12 +50,15 @@ Route::prefix('v1')->group(function () {
             Route::get('cylinders',            [CylinderController::class, 'index']);
             Route::get('cylinders/{cylinder}', [CylinderController::class, 'show']);
 
-            // Customers — read + create for salesman
-            Route::get('customers',  [CustomerController::class, 'index']);
-            Route::post('customers', [CustomerController::class, 'store']);
+            // Customers — read + create for all roles; overdue + detail for all (admin check in controller)
+            Route::get('customers',          [CustomerController::class, 'index']);
+            Route::post('customers',         [CustomerController::class, 'store']);
+            Route::get('customers/overdue',  [CustomerController::class, 'overdue']);
+            Route::get('customers/{customer}', [CustomerController::class, 'show']);
 
-            // Salesman self-service
+            // Salesman self-service (and admin)
             Route::get('salesmen/{user}',                     [SalesmanController::class, 'show']);
+            Route::get('salesmen/{user}/report',              [SalesmanController::class, 'report']);
             Route::post('allocations/{allocation}/reconcile', [SalesmanController::class, 'reconcile']);
 
             // Empty cylinder return
@@ -87,9 +90,7 @@ Route::prefix('v1')->group(function () {
                 // Sales admin actions
                 Route::delete('sales/{sale}', [SaleController::class, 'destroy']);
 
-                // Customers — overdue before {customer} to avoid route conflict
-                Route::get('customers/overdue',             [CustomerController::class, 'overdue']);
-                Route::get('customers/{customer}',          [CustomerController::class, 'show']);
+                // Customers admin actions (read/show already defined outside admin-only)
                 Route::put('customers/{customer}',          [CustomerController::class, 'update']);
                 Route::delete('customers/{customer}',       [CustomerController::class, 'destroy']);
                 Route::post('customers/{customer}/collect', [CustomerController::class, 'collect']);
@@ -102,14 +103,13 @@ Route::prefix('v1')->group(function () {
                 Route::delete('suppliers/{supplier}',   [SupplierController::class, 'destroy']);
                 Route::post('suppliers/{supplier}/pay', [SupplierController::class, 'pay']);
 
-                // Salesmen — report before {user} to avoid route conflict
+                // Salesmen admin actions (show + report already defined outside admin-only)
                 Route::get('salesmen/report',                [SalesmanController::class, 'reportAll']);
                 Route::get('salesmen',                       [SalesmanController::class, 'index']);
                 Route::post('salesmen',                      [SalesmanController::class, 'store']);
                 Route::put('salesmen/{user}',                [SalesmanController::class, 'update']);
                 Route::post('salesmen/{user}/toggle-active', [SalesmanController::class, 'toggleActive']);
                 Route::post('salesmen/{user}/allocate',      [SalesmanController::class, 'allocate']);
-                Route::get('salesmen/{user}/report',         [SalesmanController::class, 'report']);
 
                 // Expenses — summary/budget before {expense} to avoid conflict
                 Route::get('expenses/summary',         [ExpenseBudgetController::class, 'summary']);

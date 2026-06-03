@@ -2,9 +2,12 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
+import { saleService } from '../../services/saleService';
 import {
   Gauge, Package, Layers, Truck, ShoppingCart,
-  Users, Building2, Receipt, Flame, LogOut, PlusCircle
+  Users, Building2, Receipt, Flame, LogOut, PlusCircle,
+  LayoutDashboard, AlertCircle, PackageOpen, Moon, BarChart2, Settings,
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -12,6 +15,15 @@ export default function Sidebar() {
   const location  = useLocation();
   const { user, logout, isSalesman } = useAuth();
   const { t } = useTranslation();
+
+  // Dues count for badge
+  const { data: duesData } = useQuery({
+    queryKey: ['sales-dues'],
+    queryFn:  () => saleService.getAll({ has_due: true }),
+    enabled:  isSalesman,
+    refetchInterval: 60_000,
+  });
+  const duesCount = (duesData?.data || []).length;
 
   const NAV_ADMIN = [
     { group: t('nav.overview'), items: [
@@ -33,18 +45,32 @@ export default function Sidebar() {
   ];
 
   const NAV_SALESMAN = [
-    { group: t('nav.sales'), items: [
-      { path: '/sales',     label: t('sales.myDay'),   icon: ShoppingCart },
-      { path: '/sales/new', label: t('sales.newSale'), icon: PlusCircle },
+    { group: 'Overview', items: [
+      { path: '/dashboard',  label: 'Dashboard',        icon: LayoutDashboard },
+      { path: '/sales/new',  label: 'New Sale',         icon: PlusCircle },
+    ]},
+    { group: 'Sales', items: [
+      { path: '/sales',      label: 'Sales History',    icon: ShoppingCart },
+      { path: '/dues',       label: 'Outstanding Dues', icon: AlertCircle, badge: duesCount > 0 ? String(duesCount) : null },
+    ]},
+    { group: 'Customers', items: [
+      { path: '/customers',  label: 'Customers',        icon: Users },
+    ]},
+    { group: 'Operations', items: [
+      { path: '/empties',    label: 'Empty Cylinders',  icon: PackageOpen },
+      { path: '/eod',        label: 'End of Day',       icon: Moon },
+    ]},
+    { group: 'Insights', items: [
+      { path: '/reports',    label: 'My Reports',       icon: BarChart2 },
     ]},
   ];
 
   const NAV = isSalesman ? NAV_SALESMAN : NAV_ADMIN;
 
-  const isActive = (path) =>
-    path === '/' || path === '/sales'
-      ? location.pathname === path
-      : location.pathname.startsWith(path);
+  const isActive = (path) => {
+    if (path === '/' || path === '/dashboard') return location.pathname === path;
+    return location.pathname.startsWith(path);
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -57,7 +83,7 @@ export default function Sidebar() {
         <span className="mark"><Flame size={21} /></span>
         <div>
           <div className="name">Cylinder<span style={{ color: 'var(--primary)' }}>Hub</span></div>
-          <div className="sub">{isSalesman ? t('nav.salesman') : t('nav.adminConsole')}</div>
+          <div className="sub">{isSalesman ? 'Salesman Portal' : t('nav.adminConsole')}</div>
         </div>
       </div>
 
@@ -88,7 +114,7 @@ export default function Sidebar() {
           <span className="avatar">{user?.avatar_initials || '?'}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 600 }}>{user?.name}</div>
-            <div className="tiny dim">{user?.role === 'admin' ? t('nav.ownerAdmin') : t('nav.salesman')}</div>
+            <div className="tiny dim">{isSalesman ? 'Salesman' : t('nav.ownerAdmin')}</div>
           </div>
           <button className="icon-btn" onClick={handleLogout} title={t('common.logout')}>
             <LogOut size={16} style={{ color: 'var(--text-3)' }} />

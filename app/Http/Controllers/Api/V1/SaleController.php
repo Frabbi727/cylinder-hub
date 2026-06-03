@@ -24,12 +24,16 @@ class SaleController extends Controller
     public function index(Request $request): JsonResponse
     {
         $todayOnly = $request->boolean('today');
-        $filters   = $todayOnly ? ['today' => true] : [];
+        $filters   = [
+            'from'         => $request->get('from'),
+            'to'           => $request->get('to'),
+            'payment_type' => $request->get('payment_type'),
+            'search'       => $request->get('search'),
+            'has_due'      => $request->boolean('has_due'),
+        ];
 
         return $this->paginated(
-            $this->sales->paginate(auth()->user(), $todayOnly),
-            'OK',
-            $filters
+            $this->sales->paginate(auth()->user(), $todayOnly, $filters)
         );
     }
 
@@ -45,7 +49,22 @@ class SaleController extends Controller
 
     public function show(Sale $sale): JsonResponse
     {
-        return $this->success(new SaleResource($sale->load(['customer', 'salesman', 'items.cylinder'])));
+        if (auth()->user()->isSalesman() && $sale->salesman_id !== auth()->id()) {
+            abort(403, 'Access denied.');
+        }
+
+        $sale->load(['customer', 'salesman', 'items.cylinder', 'dueCollections.collectedBy']);
+
+        return $this->success([
+            'sale'            => new SaleResource($sale),
+            'payment_history' => $sale->dueCollections->map(fn ($dc) => [
+                'id'              => $dc->id,
+                'amount'          => (float) $dc->amount,
+                'collection_date' => $dc->collection_date,
+                'collected_by'    => $dc->collectedBy?->name,
+                'notes'           => $dc->notes,
+            ]),
+        ]);
     }
 
     public function destroy(Sale $sale): JsonResponse
