@@ -33,24 +33,35 @@ class SalesmanController extends Controller
 
         $salesmen = $query->orderBy('name')->get();
 
-        $salesmen->each(function ($sm) {
-            $allocs = $sm->allocations;
-            $sm->alloc_stats = [
-                'total_allocated'  => $allocs->sum('qty'),
-                'total_sold'       => $allocs->sum('sold_qty'),
-                'total_returned'   => $allocs->sum('returned_qty'),
-                'with_salesman'    => $allocs->sum('with_salesman'),
-                'collected_amount' => (float) $allocs->sum('collected_amount'),
+        // Build a plain array so alloc_stats serialises reliably
+        $salesmenData = $salesmen->map(function ($sm) {
+            $allocs       = $sm->allocations;
+            $totalAllocated  = (int)   $allocs->sum('qty');
+            $totalSold       = (int)   $allocs->sum('sold_qty');
+            $totalReturned   = (int)   $allocs->sum('returned_qty');
+            $withSalesman    = (int)   max(0, $totalAllocated - $totalSold - $totalReturned);
+            $collectedAmount = (float) $allocs->sum('collected_amount');
+
+            $smArr = $sm->toArray();
+            $smArr['alloc_stats'] = [
+                'total_allocated'  => $totalAllocated,
+                'total_sold'       => $totalSold,
+                'total_returned'   => $totalReturned,
+                'with_salesman'    => $withSalesman,
+                'collected_amount' => $collectedAmount,
             ];
-        });
+            return $smArr;
+        })->values();
+
+        $summary = [
+            'active_count'    => $salesmen->where('is_active', true)->count(),
+            'total_allocated' => (int)   $salesmenData->sum(fn ($s) => $s['alloc_stats']['total_allocated'] ?? 0),
+            'total_collected' => (float) $salesmenData->sum(fn ($s) => $s['alloc_stats']['collected_amount'] ?? 0),
+        ];
 
         return $this->success([
-            'salesmen' => $salesmen,
-            'summary'  => [
-                'active_count'    => $salesmen->where('is_active', true)->count(),
-                'total_allocated' => (int) $salesmen->sum(fn ($sm) => $sm->alloc_stats['total_allocated'] ?? 0),
-                'total_collected' => (float) $salesmen->sum(fn ($sm) => $sm->alloc_stats['collected_amount'] ?? 0),
-            ],
+            'salesmen' => $salesmenData,
+            'summary'  => $summary,
         ]);
     }
 

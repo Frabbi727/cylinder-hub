@@ -122,9 +122,13 @@ export function useAllocation() {
     setShowReconcile(true);
   };
 
+  // Handle both new {salesmen, summary} shape and any cached old array shape
+  const salesmenList    = Array.isArray(salesmenData) ? salesmenData : (salesmenData?.salesmen || []);
+  const allocSummary    = Array.isArray(salesmenData) ? {} : (salesmenData?.summary || {});
+
   return {
-    salesmen:          salesmenData?.salesmen || [],
-    allocationSummary: salesmenData?.summary  || {},
+    salesmen:          salesmenList,
+    allocationSummary: allocSummary,
     cylinders:  Array.isArray(cylinders) ? cylinders : (cylinders?.data || []),
     isLoading,
     viewDate, setViewDate, isToday, prevDay, nextDay,
