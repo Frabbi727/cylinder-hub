@@ -11,7 +11,7 @@ class StockMovementService
         int $cylinderId,
         string $eventType,
         int $changeQty,
-        int $recordedBy,
+        ?int $recordedBy,
         ?int $referenceId = null,
         ?string $notes = null
     ): void {
