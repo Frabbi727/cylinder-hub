@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\CylinderStock;
 use App\Models\StockAllocation;
 use Illuminate\Support\Facades\DB;
 
@@ -15,36 +16,47 @@ class AllocationService
 
     public function allocate(int $salesmanId, int $cylinderId, int $qty, float $salePrice, string $date): StockAllocation
     {
-        $this->stockService->removeFilledStock($cylinderId, $qty);
+        return DB::transaction(function () use ($salesmanId, $cylinderId, $qty, $salePrice, $date) {
+            $stock     = CylinderStock::where('cylinder_id', $cylinderId)->lockForUpdate()->first();
+            $available = $stock?->filled_qty ?? 0;
 
-        $allocation = StockAllocation::create([
-            'salesman_id'     => $salesmanId,
-            'cylinder_id'     => $cylinderId,
-            'allocation_date' => $date,
-            'qty'             => $qty,
-            'sale_price'      => $salePrice,
-            'sold_qty'        => 0,
-            'returned_qty'    => 0,
-            'collected_amount'=> 0,
-            'is_reconciled'   => false,
-        ]);
+            if ($qty > $available) {
+                throw new \RuntimeException(
+                    "Insufficient stock. Only {$available} filled cylinder(s) available for allocation."
+                );
+            }
 
-        $this->movements->record(
-            $cylinderId,
-            'allocation',
-            -$qty,
-            auth()->id(),
-            $allocation->id,
-            "Allocation #{$allocation->id} — {$qty} pcs allocated to salesman #{$salesmanId}"
-        );
+            $this->stockService->removeFilledStock($cylinderId, $qty);
 
-        $this->audit->log(
-            'created', 'Allocation', $allocation->id, auth()->id(),
-            "Admin allocated {$qty} pcs of cylinder #{$cylinderId} to salesman #{$salesmanId}",
-            null, $allocation->toArray()
-        );
+            $allocation = StockAllocation::create([
+                'salesman_id'      => $salesmanId,
+                'cylinder_id'      => $cylinderId,
+                'allocation_date'  => $date,
+                'qty'              => $qty,
+                'sale_price'       => $salePrice,
+                'sold_qty'         => 0,
+                'returned_qty'     => 0,
+                'collected_amount' => 0,
+                'is_reconciled'    => false,
+            ]);
 
-        return $allocation;
+            $this->movements->record(
+                $cylinderId,
+                'allocation',
+                -$qty,
+                auth()->id(),
+                $allocation->id,
+                "Allocation #{$allocation->id} — {$qty} pcs allocated to salesman #{$salesmanId}"
+            );
+
+            $this->audit->log(
+                'created', 'Allocation', $allocation->id, auth()->id(),
+                "Admin allocated {$qty} pcs of cylinder #{$cylinderId} to salesman #{$salesmanId}",
+                null, $allocation->toArray()
+            );
+
+            return $allocation;
+        });
     }
 
     public function reconcile(

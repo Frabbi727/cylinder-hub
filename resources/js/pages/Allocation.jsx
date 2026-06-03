@@ -246,7 +246,8 @@ export default function Allocation() {
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom: isLoss || isBreakEven ? 8 : 16 }}>
                 <div>
                   <label className="label">{t('common.qty')} *</label>
-                  <input type="number" className="input" min="1" value={allocForm.qty} onChange={e => setAllocForm(f => ({...f, qty: e.target.value}))} required />
+                  <input type="number" className="input" min="1" max={selectedCyl?.stock?.filled_qty || undefined} value={allocForm.qty} onChange={e => setAllocForm(f => ({...f, qty: e.target.value}))} required />
+                  {selectedCyl && <div className="dim tiny" style={{ marginTop:4 }}>{selectedCyl.stock?.filled_qty || 0} {t('allocation.availableFilled')}</div>}
                 </div>
                 <div>
                   <label className="label">{t('allocation.salePrice')} *</label>
