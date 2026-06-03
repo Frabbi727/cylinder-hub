@@ -197,6 +197,13 @@ export default function EndOfDay() {
         <span>Reconcile each allocation by confirming sold qty, empty returns, and cash collected. This cannot be undone.</span>
       </div>
 
+      {allocations.some(a => !a.is_reconciled && a.allocation_date < todayStr) && (
+        <div style={{ background: '#FEF2F2', border: '1px solid #B83030', borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: '#B83030', display: 'flex', gap: 8 }}>
+          <AlertCircle size={15} style={{ marginTop: 1, flexShrink: 0 }} />
+          <span><strong>Overdue:</strong> You have unreconciled allocations from previous days. Please reconcile them below.</span>
+        </div>
+      )}
+
       {allocations.length === 0 ? (
         <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>
           No allocations for today.
@@ -213,6 +220,11 @@ export default function EndOfDay() {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, fontSize: 15 }}>{a.cylinder?.name} {a.cylinder?.size}</div>
                     <div style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 600 }}>{TK(a.sale_price)}/pcs</div>
+                    {a.allocation_date && a.allocation_date < todayStr && (
+                      <div style={{ fontSize: 11, color: '#B83030', fontWeight: 600, marginTop: 2 }}>
+                        ⚠ From {a.allocation_date}
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: 'flex', gap: 16, textAlign: 'center', fontSize: 12 }}>
                     <div><div style={{ fontWeight: 700, fontSize: 16 }}>{a.qty}</div><div style={{ color: 'var(--text-3)' }}>Allocated</div></div>

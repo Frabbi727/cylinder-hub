@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\StockAllocation;
+use Illuminate\Support\Facades\DB;
 
 class AllocationService
 {
@@ -56,36 +57,39 @@ class AllocationService
             throw new \LogicException('Allocation #'.$allocation->id.' is already reconciled.');
         }
 
-        $unsold = max(0, $allocation->qty - $soldQty - $returnedQty);
-        if ($unsold > 0) {
-            $this->stockService->addFilledStock($allocation->cylinder_id, $unsold);
-            $this->movements->record(
-                $allocation->cylinder_id,
-                'eod_return',
-                $unsold,
-                auth()->id(),
-                $allocation->id,
-                "EOD reconcile #{$allocation->id} — {$unsold} unsold units returned to stock"
+        return DB::transaction(function () use ($allocation, $soldQty, $returnedQty, $collectedAmount) {
+            $unsold = max(0, $allocation->qty - $soldQty - $returnedQty);
+
+            if ($unsold > 0) {
+                $this->stockService->addFilledStock($allocation->cylinder_id, $unsold);
+                $this->movements->record(
+                    $allocation->cylinder_id,
+                    'eod_return',
+                    $unsold,
+                    auth()->id(),
+                    $allocation->id,
+                    "EOD reconcile #{$allocation->id} — {$unsold} unsold units returned to stock"
+                );
+            }
+
+            if ($returnedQty > 0) {
+                $this->stockService->addEmptyStock($allocation->cylinder_id, $returnedQty);
+            }
+
+            $allocation->update([
+                'sold_qty'         => $soldQty,
+                'returned_qty'     => $returnedQty,
+                'collected_amount' => $collectedAmount,
+                'is_reconciled'    => true,
+            ]);
+
+            $this->audit->log(
+                'reconciled', 'Allocation', $allocation->id, auth()->id(),
+                "Salesman #{$allocation->salesman_id} submitted EOD — {$soldQty} sold, {$returnedQty} returned, ৳" . number_format($collectedAmount, 2) . ' cash',
+                null, null
             );
-        }
 
-        if ($returnedQty > 0) {
-            $this->stockService->addEmptyStock($allocation->cylinder_id, $returnedQty);
-        }
-
-        $allocation->update([
-            'sold_qty'         => $soldQty,
-            'returned_qty'     => $returnedQty,
-            'collected_amount' => $collectedAmount,
-            'is_reconciled'    => true,
-        ]);
-
-        $this->audit->log(
-            'reconciled', 'Allocation', $allocation->id, auth()->id(),
-            "Salesman #{$allocation->salesman_id} submitted EOD — {$soldQty} sold, {$returnedQty} returned, ৳" . number_format($collectedAmount, 2) . ' cash',
-            null, $allocation->toArray()
-        );
-
-        return $allocation->fresh(['salesman', 'cylinder']);
+            return $allocation->fresh(['salesman', 'cylinder']);
+        });
     }
 }

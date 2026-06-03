@@ -40,7 +40,14 @@ class SalesmanController extends Controller
             abort(403, 'Access denied.');
         }
 
-        $user->load(['allocations' => fn ($q) => $q->today()->with('cylinder')]);
+        // Load today's allocations AND any unreconciled allocations from previous days
+        $user->load(['allocations' => function ($q) {
+            $q->where(function ($sub) {
+                $sub->whereDate('allocation_date', today())          // today's
+                    ->orWhere('is_reconciled', false);               // or any pending
+            })->with('cylinder')->orderBy('allocation_date', 'desc');
+        }]);
+
         $todaySales = $this->saleRepository->salesmanSales($user->id, today()->toDateString());
 
         return $this->success([

@@ -10,7 +10,7 @@ class AuditLogService
         string $action,
         string $model,
         int $modelId,
-        int $userId,
+        ?int $userId,
         ?string $description = null,
         ?array $oldValue = null,
         ?array $newValue = null,
