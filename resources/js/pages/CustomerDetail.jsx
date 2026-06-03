@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { customerService } from '../services/customerService';
 import { saleService } from '../services/saleService';
@@ -7,7 +7,7 @@ import StatusPill from '../components/ui/StatusPill';
 import CylBadge from '../components/ui/CylBadge';
 import Modal from '../components/ui/Modal';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
-import { ChevronLeft, CreditCard, AlertCircle } from 'lucide-react';
+import { ChevronLeft, CreditCard, AlertCircle, Package } from 'lucide-react';
 
 const TK       = (n) => '৳' + Number(n || 0).toLocaleString('en-US');
 const todayStr = new Date().toISOString().split('T')[0];
@@ -32,6 +32,12 @@ export default function CustomerDetail() {
     enabled:  !!id,
   });
 
+  const { data: emptiesData } = useQuery({
+    queryKey: ['customer-empties', id],
+    queryFn:  () => customerService.getEmpties(id),
+    enabled:  tab === 'empties' && !!id,
+  });
+
   const payMutation = useMutation({
     mutationFn: ({ sid, data }) => saleService.payBalance(sid, data),
     onSuccess: () => {
@@ -46,10 +52,12 @@ export default function CustomerDetail() {
 
   if (isLoading) return <LoadingSpinner text="Loading customer..." />;
 
-  const customer = custData?.data;
-  const allSales = salesData?.data || [];
-  const custSales = allSales.filter(s => s.customer_id === parseInt(id));
-  const payments  = customer?.due_collections || [];
+  const customer    = custData?.data;
+  const allSales    = salesData?.data || [];
+  const custSales   = allSales.filter(s => s.customer_id === parseInt(id));
+  const payments    = customer?.due_collections || [];
+  const empties     = emptiesData?.data?.balances || [];
+  const totalPending= emptiesData?.data?.total_pending || 0;
 
   const totalRevenue = custSales.reduce((s, x) => s + parseFloat(x.total_amount || 0), 0);
   const totalPaid    = custSales.reduce((s, x) => s + parseFloat(x.paid_amount || 0), 0);
@@ -58,7 +66,7 @@ export default function CustomerDetail() {
   const TABS = [
     { key: 'sales',    label: 'Sales History' },
     { key: 'payments', label: 'Payment History' },
-    { key: 'notes',    label: 'Notes' },
+    { key: 'empties',  label: `Empty Cylinders${totalPending > 0 ? ` (${totalPending} pending)` : ''}` },
   ];
 
   return (
@@ -193,10 +201,56 @@ export default function CustomerDetail() {
         </div>
       )}
 
-      {/* Notes */}
-      {tab === 'notes' && (
-        <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--text-3)' }}>
-          Notes feature coming soon.
+      {/* Empty Cylinders */}
+      {tab === 'empties' && (
+        <div className="card" style={{ padding: 0 }}>
+          {empties.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>
+              <Package size={32} style={{ marginBottom: 10, opacity: 0.3 }} />
+              <div>No cylinder balance data for this customer.</div>
+            </div>
+          ) : (
+            <table className="tbl" style={{ width: '100%' }}>
+              <thead>
+                <tr>
+                  <th>Cylinder Type</th>
+                  <th style={{ textAlign: 'center' }}>Sold to Customer</th>
+                  <th style={{ textAlign: 'center' }}>Returned</th>
+                  <th style={{ textAlign: 'center' }}>Pending (at Customer)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {empties.map(b => (
+                  <tr key={b.cylinder_id} style={{ background: b.pending_qty > 0 ? '#FFFBF0' : undefined }}>
+                    <td style={{ fontWeight: 600 }}>
+                      {b.cylinder_name} {b.cylinder_size}
+                    </td>
+                    <td style={{ textAlign: 'center', color: 'var(--text-2)' }}>{b.sold_qty}</td>
+                    <td style={{ textAlign: 'center', color: 'var(--success)', fontWeight: 600 }}>{b.returned_qty}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      {b.pending_qty > 0 ? (
+                        <span style={{ fontWeight: 800, color: '#A85200', fontSize: 15 }}>{b.pending_qty}</span>
+                      ) : (
+                        <span style={{ color: 'var(--success)', fontWeight: 600 }}>✓ 0</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              {totalPending > 0 && (
+                <tfoot>
+                  <tr>
+                    <td colSpan={3} style={{ textAlign: 'right', fontWeight: 700, fontSize: 13, padding: '10px 16px', color: 'var(--text-2)' }}>
+                      Total pending empties:
+                    </td>
+                    <td style={{ textAlign: 'center', fontWeight: 800, fontSize: 16, color: '#A85200' }}>
+                      {totalPending}
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          )}
         </div>
       )}
 

@@ -4,10 +4,12 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { saleService } from '../../services/saleService';
+import { stockService } from '../../services/stockService';
 import {
   Gauge, Package, Layers, Truck, ShoppingCart,
   Users, Building2, Receipt, Flame, LogOut, PlusCircle,
-  LayoutDashboard, AlertCircle, PackageOpen, Moon, BarChart2, Settings,
+  LayoutDashboard, AlertCircle, PackageOpen, Moon, BarChart2,
+  RotateCcw,
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -16,7 +18,7 @@ export default function Sidebar() {
   const { user, logout, isSalesman } = useAuth();
   const { t } = useTranslation();
 
-  // Dues count for badge
+  // Dues count badge (salesman)
   const { data: duesData } = useQuery({
     queryKey: ['sales-dues'],
     queryFn:  () => saleService.getAll({ has_due: true }),
@@ -25,15 +27,25 @@ export default function Sidebar() {
   });
   const duesCount = (duesData?.data || []).length;
 
+  // Pending extra returns badge (admin)
+  const { data: extrasData } = useQuery({
+    queryKey: ['pending-extras-count'],
+    queryFn:  () => stockService.getReturns({ is_extra: 1, is_verified: 'null' }),
+    enabled:  !isSalesman,
+    refetchInterval: 60_000,
+  });
+  const pendingExtras = (extrasData?.data || []).length;
+
   const NAV_ADMIN = [
     { group: t('nav.overview'), items: [
       { path: '/',           label: t('nav.dashboard'),  icon: Gauge },
     ]},
     { group: t('nav.operations'), items: [
-      { path: '/inventory',  label: t('nav.inventory'),  icon: Package },
-      { path: '/purchases',  label: t('nav.purchases'),  icon: Layers, badge: 'FIFO' },
-      { path: '/sales',      label: t('nav.sales'),      icon: ShoppingCart },
-      { path: '/allocation', label: t('nav.allocation'), icon: Truck },
+      { path: '/inventory',      label: t('nav.inventory'),      icon: Package },
+      { path: '/purchases',      label: t('nav.purchases'),      icon: Layers, badge: 'FIFO' },
+      { path: '/sales',          label: t('nav.sales'),          icon: ShoppingCart },
+      { path: '/allocation',     label: t('nav.allocation'),     icon: Truck },
+      { path: '/extra-returns',  label: 'Extra Returns',         icon: RotateCcw, badge: pendingExtras > 0 ? String(pendingExtras) : null, badgeDanger: true },
     ]},
     { group: t('nav.people'), items: [
       { path: '/customers',  label: t('nav.customers'),  icon: Users },
@@ -101,7 +113,11 @@ export default function Sidebar() {
                 >
                   <Icon size={18} />
                   <span>{item.label}</span>
-                  {item.badge && <span className="nav-count">{item.badge}</span>}
+                  {item.badge && (
+                    <span className="nav-count" style={item.badgeDanger ? { background: '#B83030', color: '#fff' } : undefined}>
+                      {item.badge}
+                    </span>
+                  )}
                 </button>
               );
             })}

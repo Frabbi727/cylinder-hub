@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\StoreCustomerRequest;
 use App\Models\Customer;
+use App\Models\CylinderReturn;
 use App\Models\DueCollection;
+use App\Models\SaleItem;
 use App\Repositories\Contracts\CustomerRepositoryInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -119,5 +121,56 @@ class CustomerController extends Controller
         ]);
 
         return $this->success($results, 'OK', 200);
+    }
+
+    public function empties(Customer $customer): JsonResponse
+    {
+        // Total cylinders sold to this customer, grouped by cylinder type
+        $sold = SaleItem::select('cylinder_id', DB::raw('SUM(qty) as sold_qty'))
+            ->whereHas('sale', fn ($q) => $q->where('customer_id', $customer->id)->whereNull('deleted_at'))
+            ->groupBy('cylinder_id')
+            ->with('cylinder')
+            ->get()
+            ->keyBy('cylinder_id');
+
+        // Total empties already returned by this customer
+        $returned = CylinderReturn::select('cylinder_id', DB::raw('SUM(qty) as returned_qty'))
+            ->where('customer_id', $customer->id)
+            ->where('type', 'empty_return')
+            ->where(fn ($q) => $q->whereNull('is_verified')->orWhere('is_verified', true))
+            ->groupBy('cylinder_id')
+            ->get()
+            ->keyBy('cylinder_id');
+
+        // Merge into a balance per cylinder
+        $allCylinderIds = $sold->keys()->merge($returned->keys())->unique();
+
+        $balances = $allCylinderIds->map(function ($cylinderId) use ($sold, $returned) {
+            $soldRow     = $sold->get($cylinderId);
+            $returnedRow = $returned->get($cylinderId);
+
+            $soldQty     = (int) ($soldRow?->sold_qty     ?? 0);
+            $returnedQty = (int) ($returnedRow?->returned_qty ?? 0);
+            $pending     = max(0, $soldQty - $returnedQty);
+
+            $cylinder = $soldRow?->cylinder ?? $returnedRow?->cylinder ?? null;
+
+            return [
+                'cylinder_id'   => $cylinderId,
+                'cylinder_name' => $cylinder?->name,
+                'cylinder_size' => $cylinder?->size,
+                'color1'        => $cylinder?->color1,
+                'color2'        => $cylinder?->color2,
+                'sold_qty'      => $soldQty,
+                'returned_qty'  => $returnedQty,
+                'pending_qty'   => $pending,
+            ];
+        })->values();
+
+        return $this->success([
+            'customer'  => ['id' => $customer->id, 'name' => $customer->name],
+            'balances'  => $balances,
+            'total_pending' => $balances->sum('pending_qty'),
+        ]);
     }
 }

@@ -5,30 +5,66 @@ import { cylinderService } from '../services/cylinderService';
 import { customerService } from '../services/customerService';
 import Modal from '../components/ui/Modal';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
-import { Package, AlertCircle, Plus, CheckCircle } from 'lucide-react';
+import { Package, AlertCircle, Plus, CheckCircle, Clock } from 'lucide-react';
 
 const todayStr = new Date().toISOString().split('T')[0];
 
 const EXTRA_REASONS = [
-  { value: 'old_stock',          label: 'Old stock' },
-  { value: 'neighbour',          label: 'Neighbour collection' },
-  { value: 'competitor',         label: 'Competitor cylinder' },
-  { value: 'salesman_handover',  label: 'Salesman handover' },
-  { value: 'other',              label: 'Other' },
+  { value: 'old_stock',         label: 'Old stock' },
+  { value: 'neighbour',         label: 'Neighbour collection' },
+  { value: 'competitor',        label: 'Competitor cylinder' },
+  { value: 'salesman_handover', label: 'Salesman handover' },
+  { value: 'other',             label: 'Other' },
 ];
+
+const EXTRA_REASON_LABELS = Object.fromEntries(EXTRA_REASONS.map(r => [r.value, r.label]));
+
+function ReturnStatusBadge({ row }) {
+  if (!row.is_extra) {
+    return <span className="pill pill-teal" style={{ fontSize: 11 }}>Normal</span>;
+  }
+  if (row.is_verified === null || row.is_verified === undefined) {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <span className="pill pill-purple" style={{ fontSize: 11 }}>EXTRA</span>
+        <span className="pill pill-amber" style={{ fontSize: 11 }}>Pending</span>
+      </span>
+    );
+  }
+  if (row.is_verified) {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <span className="pill pill-purple" style={{ fontSize: 11 }}>EXTRA</span>
+        <span className="pill pill-green" style={{ fontSize: 11 }}>Verified</span>
+      </span>
+    );
+  }
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <span className="pill pill-purple" style={{ fontSize: 11 }}>EXTRA</span>
+      <span className="pill pill-coral" style={{ fontSize: 11 }}>Rejected</span>
+    </span>
+  );
+}
 
 export default function Empties() {
   const qc = useQueryClient();
-  const [showModal, setShowModal] = useState(false);
-  const [modalTab, setModalTab]   = useState('normal'); // 'normal' | 'extra'
-  const [form, setForm]           = useState({ cylinder_id: '', customer_id: '', qty: 1, return_date: todayStr, notes: '', extra_reason: '' });
-  const [error, setError]         = useState('');
-  const [success, setSuccess]     = useState('');
-  const [custSearch, setCustSearch] = useState('');
+  const [showModal, setShowModal]     = useState(false);
+  const [modalTab, setModalTab]       = useState('normal');
+  const [form, setForm]               = useState({ cylinder_id: '', customer_id: '', qty: 1, return_date: todayStr, notes: '', extra_reason: '' });
+  const [error, setError]             = useState('');
+  const [success, setSuccess]         = useState('');
+  const [custSearch, setCustSearch]   = useState('');
 
   const { data: stockData, isLoading } = useQuery({
     queryKey: ['stock'],
     queryFn:  stockService.getAll,
+    refetchInterval: 30_000,
+  });
+
+  const { data: todayReturns, isLoading: returnsLoading } = useQuery({
+    queryKey: ['my-returns-today'],
+    queryFn:  () => stockService.getReturns({ date: todayStr }),
     refetchInterval: 30_000,
   });
 
@@ -47,6 +83,8 @@ export default function Empties() {
     mutationFn: (data) => stockService.storeReturn(data),
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['stock'] });
+      qc.invalidateQueries({ queryKey: ['my-returns-today'] });
+      qc.invalidateQueries({ queryKey: ['my-allocations'] });
       const isExtra = vars.is_extra;
       setSuccess(isExtra
         ? 'Extra return logged! Admin will be notified for verification.'
@@ -61,9 +99,11 @@ export default function Empties() {
     onError: (e) => setError(e.response?.data?.message || 'Failed to record return'),
   });
 
-  const cylinderList = Array.isArray(cylinders) ? cylinders : (cylinders?.data || []);
-  const stockList    = stockData?.data || [];
-  const customers    = custData?.data || [];
+  const cylinderList  = Array.isArray(cylinders) ? cylinders : (cylinders?.data || []);
+  const stockList     = stockData?.data || [];
+  const customers     = custData?.data || [];
+  const returnsList   = todayReturns?.data || [];
+  const pendingExtras = returnsList.filter(r => r.is_extra && r.is_verified == null).length;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -102,7 +142,15 @@ export default function Empties() {
         </div>
       )}
 
-      {/* Stock snapshot table */}
+      {/* Pending extra alert */}
+      {pendingExtras > 0 && (
+        <div style={{ background: '#FFF1DD', border: '1px solid #FF9500', borderRadius: 8, padding: '10px 16px', marginBottom: 14, fontSize: 13, color: '#A85200', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Clock size={15} />
+          <span>{pendingExtras} extra return{pendingExtras > 1 ? 's' : ''} awaiting admin verification.</span>
+        </div>
+      )}
+
+      {/* Stock snapshot */}
       <div className="card" style={{ padding: 0, marginBottom: 20 }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-soft)' }}>
           <div style={{ fontWeight: 700, fontSize: 15 }}>Live Stock Snapshot</div>
@@ -123,7 +171,7 @@ export default function Empties() {
             </thead>
             <tbody>
               {stockList.map((s) => {
-                const total = (s.filled_qty || 0) + (s.empty_qty || 0);
+                const total   = (s.filled_qty || 0) + (s.empty_qty || 0);
                 const fillPct = total > 0 ? Math.round((s.filled_qty || 0) / total * 100) : 0;
                 const isCritical = s.filled_qty <= (s.reorder_level || 0);
                 return (
@@ -132,9 +180,7 @@ export default function Empties() {
                       {s.name || s.cylinder?.name} {s.size || s.cylinder?.size}
                       {isCritical && <span className="pill pill-coral" style={{ fontSize: 10, marginLeft: 8 }}>Low Stock</span>}
                     </td>
-                    <td style={{ textAlign: 'center', fontWeight: 700, color: isCritical ? '#B83030' : 'var(--text-1)' }}>
-                      {s.filled_qty || 0}
-                    </td>
+                    <td style={{ textAlign: 'center', fontWeight: 700, color: isCritical ? '#B83030' : 'var(--text-1)' }}>{s.filled_qty || 0}</td>
                     <td style={{ textAlign: 'center', color: 'var(--text-2)' }}>{s.empty_qty || 0}</td>
                     <td style={{ textAlign: 'center', color: 'var(--primary)', fontWeight: 600 }}>{s.allocated_qty || 0}</td>
                     <td style={{ minWidth: 100 }}>
@@ -150,11 +196,59 @@ export default function Empties() {
         )}
       </div>
 
+      {/* Today's returns */}
+      <div className="card" style={{ padding: 0 }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-soft)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>Today's Returns</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>Returns you logged today</div>
+          </div>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{returnsList.length} record{returnsList.length !== 1 ? 's' : ''}</span>
+        </div>
+        {returnsLoading ? (
+          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-3)' }}>Loading...</div>
+        ) : returnsList.length === 0 ? (
+          <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>
+            No returns logged today. Use the button above to log one.
+          </div>
+        ) : (
+          <table className="tbl" style={{ width: '100%' }}>
+            <thead>
+              <tr>
+                <th>Cylinder</th>
+                <th>Customer</th>
+                <th style={{ textAlign: 'center' }}>Qty</th>
+                <th>Type / Status</th>
+                <th>Reason</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {returnsList.map(r => (
+                <tr key={r.id} style={{ background: r.is_extra && r.is_verified == null ? '#FFFBF0' : undefined }}>
+                  <td style={{ fontWeight: 600, fontSize: 13 }}>
+                    {r.cylinder?.name} {r.cylinder?.size}
+                  </td>
+                  <td style={{ fontSize: 13, color: 'var(--text-2)' }}>{r.customer?.name || '—'}</td>
+                  <td style={{ textAlign: 'center', fontWeight: 700 }}>{r.qty}</td>
+                  <td><ReturnStatusBadge row={r} /></td>
+                  <td style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                    {r.extra_reason ? EXTRA_REASON_LABELS[r.extra_reason] || r.extra_reason : '—'}
+                  </td>
+                  <td style={{ fontSize: 12, color: 'var(--text-3)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {r.notes || '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
       {/* Log Empty Return Modal */}
       {showModal && (
         <Modal title="Log Empty Return" onClose={() => { setShowModal(false); setError(''); }} size="md">
-          {/* Tabs */}
-          <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border-soft)', paddingBottom: 0 }}>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border-soft)' }}>
             {[{ key: 'normal', label: 'Normal Return' }, { key: 'extra', label: 'Extra Return' }].map(t => (
               <button key={t.key} className={`tab-btn${modalTab === t.key ? ' active' : ''}`}
                 style={{ borderRadius: '6px 6px 0 0', marginBottom: -1 }}
@@ -167,7 +261,7 @@ export default function Empties() {
           {modalTab === 'extra' && (
             <div style={{ background: '#FFF1DD', border: '1px solid #FF9500', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#A85200', display: 'flex', gap: 8 }}>
               <AlertCircle size={15} style={{ marginTop: 1, flexShrink: 0 }} />
-              <span>Admin will be notified for verification. Extra returns are held as pending until approved.</span>
+              <span>Admin will be notified for verification. Stock is provisionally updated until approved or rejected.</span>
             </div>
           )}
 
@@ -223,7 +317,7 @@ export default function Empties() {
               <div style={{ marginBottom: 12 }}>
                 <label className="label">Reason *</label>
                 <select className="select" value={form.extra_reason}
-                  onChange={e => setForm(f => ({ ...f, extra_reason: e.target.value }))} required={modalTab === 'extra'}>
+                  onChange={e => setForm(f => ({ ...f, extra_reason: e.target.value }))} required>
                   <option value="">Select reason...</option>
                   {EXTRA_REASONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>

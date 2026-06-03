@@ -51,17 +51,19 @@ Route::prefix('v1')->group(function () {
             Route::get('cylinders/{cylinder}', [CylinderController::class, 'show']);
 
             // Customers — read + create for all roles; overdue + detail for all (admin check in controller)
-            Route::get('customers',          [CustomerController::class, 'index']);
-            Route::post('customers',         [CustomerController::class, 'store']);
-            Route::get('customers/overdue',  [CustomerController::class, 'overdue']);
-            Route::get('customers/{customer}', [CustomerController::class, 'show']);
+            Route::get('customers',                    [CustomerController::class, 'index']);
+            Route::post('customers',                   [CustomerController::class, 'store']);
+            Route::get('customers/overdue',            [CustomerController::class, 'overdue']);
+            Route::get('customers/{customer}',         [CustomerController::class, 'show']);
+            Route::get('customers/{customer}/empties', [CustomerController::class, 'empties']);
 
             // Salesman self-service (and admin)
             Route::get('salesmen/{user}',                     [SalesmanController::class, 'show']);
             Route::get('salesmen/{user}/report',              [SalesmanController::class, 'report']);
             Route::post('allocations/{allocation}/reconcile', [SalesmanController::class, 'reconcile']);
 
-            // Empty cylinder return
+            // Empty cylinder returns — all roles read own, all roles post
+            Route::get('returns',  [StockController::class, 'returns']);
             Route::post('returns', [StockController::class, 'storeReturn']);
 
             // ── Admin-only ────────────────────────────────────────────────────
@@ -127,7 +129,10 @@ Route::prefix('v1')->group(function () {
                 Route::post('stock/refill/{refill}/receive',[RefillController::class, 'receive']);
                 Route::get('stock/{cylinderId}/history',    [StockController::class, 'history']);
                 Route::get('stock',                         [StockController::class, 'index']);
-                Route::get('returns',                       [StockController::class, 'returns']);
+
+                // Extra return verification (admin-only)
+                Route::post('returns/{return}/verify', [StockController::class, 'verifyReturn']);
+                Route::post('returns/{return}/reject', [StockController::class, 'rejectReturn']);
 
                 // Audit logs
                 Route::get('audit-logs', [AuditLogController::class, 'index']);

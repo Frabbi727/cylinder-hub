@@ -5,7 +5,8 @@ import Login from '../pages/auth/Login';
 import AppShell from '../components/layout/AppShell';
 
 // Admin pages
-import Dashboard    from '../pages/Dashboard';
+import Dashboard     from '../pages/Dashboard';
+import ExtraReturns  from '../pages/admin/ExtraReturns';
 import Inventory    from '../pages/Inventory';
 import Purchases    from '../pages/Purchases';
 import Sales        from '../pages/Sales';
@@ -66,11 +67,12 @@ export default function Router() {
                 <Route index element={<AdminRoute><Dashboard /></AdminRoute>} />
 
                 {/* ── Admin routes ── */}
-                <Route path="inventory"  element={<AdminRoute><Inventory /></AdminRoute>} />
-                <Route path="purchases"  element={<AdminRoute><Purchases /></AdminRoute>} />
-                <Route path="allocation" element={<AdminRoute><Allocation /></AdminRoute>} />
-                <Route path="suppliers"  element={<AdminRoute><Suppliers /></AdminRoute>} />
-                <Route path="expenses"   element={<AdminRoute><Expenses /></AdminRoute>} />
+                <Route path="inventory"      element={<AdminRoute><Inventory /></AdminRoute>} />
+                <Route path="purchases"      element={<AdminRoute><Purchases /></AdminRoute>} />
+                <Route path="allocation"     element={<AdminRoute><Allocation /></AdminRoute>} />
+                <Route path="suppliers"      element={<AdminRoute><Suppliers /></AdminRoute>} />
+                <Route path="expenses"       element={<AdminRoute><Expenses /></AdminRoute>} />
+                <Route path="extra-returns"  element={<AdminRoute><ExtraReturns /></AdminRoute>} />
 
                 {/* ── Shared (admin + salesman) ── */}
                 <Route path="sales"     element={<Sales />} />

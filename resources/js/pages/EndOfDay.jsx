@@ -1,13 +1,15 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { salesmanService } from '../services/salesmanService';
+import { stockService } from '../services/stockService';
 import CylBadge from '../components/ui/CylBadge';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
-import { CheckCircle, AlertCircle, Moon } from 'lucide-react';
+import { CheckCircle, AlertCircle, Moon, Info } from 'lucide-react';
 
-const TK = (n) => '৳' + Number(n || 0).toLocaleString('en-US');
-const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+const TK      = (n) => '৳' + Number(n || 0).toLocaleString('en-US');
+const todayStr = new Date().toISOString().split('T')[0];
+const today    = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
 function ReconcileForm({ alloc, onSuccess, onCancel }) {
   const qc = useQueryClient();
@@ -17,6 +19,28 @@ function ReconcileForm({ alloc, onSuccess, onCancel }) {
     collected_amount: String(alloc.collected_amount ?? ''),
   });
   const [error, setError] = useState('');
+
+  // Fetch logged returns for this allocation to pre-fill returned_qty
+  const { data: returnsData } = useQuery({
+    queryKey: ['allocation-returns', alloc.id],
+    queryFn:  () => stockService.getReturns({ allocation_id: alloc.id }),
+    enabled:  !!alloc.id,
+  });
+
+  const loggedReturns = returnsData?.data || [];
+  const loggedNormal  = loggedReturns.filter(r => !r.is_extra);
+  const loggedExtra   = loggedReturns.filter(r => r.is_extra && r.is_verified !== false);
+  const loggedTotal   = loggedReturns
+    .filter(r => r.is_verified !== false)
+    .reduce((s, r) => s + (r.qty || 0), 0);
+  const hasLoggedReturns = loggedTotal > 0;
+
+  // Pre-fill returned_qty once returns are loaded (only if field is still at default)
+  useEffect(() => {
+    if (hasLoggedReturns && form.returned_qty === String(alloc.returned_qty ?? 0)) {
+      setForm(f => ({ ...f, returned_qty: String(loggedTotal) }));
+    }
+  }, [loggedTotal]); // eslint-disable-line
 
   const reconcileMutation = useMutation({
     mutationFn: (data) => salesmanService.reconcile(alloc.id, data),
@@ -68,6 +92,17 @@ function ReconcileForm({ alloc, onSuccess, onCancel }) {
             <label className="label">Empties Returned *</label>
             <input type="number" className="input" min="0"
               value={form.returned_qty} onChange={e => setForm(f => ({ ...f, returned_qty: e.target.value }))} required />
+            {hasLoggedReturns && (
+              <div style={{ marginTop: 4, fontSize: 11, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Info size={11} />
+                {loggedTotal} logged ({loggedNormal.length > 0 ? `${loggedNormal.reduce((s,r)=>s+r.qty,0)} normal` : ''}
+                {loggedNormal.length > 0 && loggedExtra.length > 0 ? ' + ' : ''}
+                {loggedExtra.length > 0 ? `${loggedExtra.reduce((s,r)=>s+r.qty,0)} extra` : ''})
+                {parseInt(form.returned_qty) !== loggedTotal && (
+                  <span style={{ color: '#A85200', marginLeft: 4 }}>⚠ differs from logged</span>
+                )}
+              </div>
+            )}
           </div>
           <div>
             <label className="label">Cash Submitted ৳ *</label>

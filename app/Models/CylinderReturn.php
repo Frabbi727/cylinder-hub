@@ -8,6 +8,7 @@ class CylinderReturn extends Model
 {
     protected $fillable = [
         'sale_id', 'customer_id', 'cylinder_id', 'recorded_by',
+        'salesman_id', 'allocation_id',
         'qty', 'type', 'return_date', 'notes',
         'is_extra', 'extra_reason', 'is_verified',
     ];
@@ -16,6 +17,8 @@ class CylinderReturn extends Model
     {
         return [
             'return_date' => 'date',
+            'is_extra'    => 'boolean',
+            'is_verified' => 'boolean',
         ];
     }
 
@@ -37,5 +40,15 @@ class CylinderReturn extends Model
     public function recordedBy()
     {
         return $this->belongsTo(User::class, 'recorded_by');
+    }
+
+    public function salesman()
+    {
+        return $this->belongsTo(User::class, 'salesman_id');
+    }
+
+    public function allocation()
+    {
+        return $this->belongsTo(StockAllocation::class, 'allocation_id');
     }
 }
