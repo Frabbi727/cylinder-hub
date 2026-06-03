@@ -132,14 +132,13 @@ export default function Sales() {
   const activeAllocations    = allAllocations.filter(a => !a.is_reconciled);
   const reconciledAllocations= allAllocations.filter(a =>  a.is_reconciled);
 
-  // Summary stats — include all of today's allocations (active + reconciled)
-  const totalAllocated = allAllocations.reduce((s, a) => s + a.qty, 0);
-  const totalSold      = allAllocations.reduce((s, a) => s + (a.sold_qty || 0), 0);
-  const totalReturned  = allAllocations.reduce((s, a) => s + (a.returned_qty || 0), 0);
-  const totalRemaining = activeAllocations.reduce((s, a) => s + Math.max(0, a.qty - (a.sold_qty || 0) - (a.returned_qty || 0)), 0);
-  // Cash collected = today's sales paid amounts + any reconciled collected_amount
-  const reconciledCash = reconciledAllocations.reduce((s, a) => s + parseFloat(a.collected_amount || 0), 0);
-  const totalCashCollected = todayCashCollected + reconciledCash;
+  // Summary stats — from backend (SalesmanController::show stats object)
+  const apiStats       = myData?.data?.stats ?? {};
+  const totalAllocated = apiStats.total_allocated ?? 0;
+  const totalSold      = apiStats.total_sold      ?? 0;
+  const totalReturned  = apiStats.total_returned  ?? 0;
+  const totalRemaining = apiStats.total_remaining ?? 0;
+  const totalCashCollected = todayCashCollected;
 
   // All cylinders for empty return dropdown
   const { data: cylinders } = useQuery({

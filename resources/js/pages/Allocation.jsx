@@ -25,7 +25,7 @@ export default function Allocation() {
   const { t } = useTranslation();
 
   const {
-    salesmen, cylinders, isLoading,
+    salesmen, allocationSummary, cylinders, isLoading,
     viewDate, setViewDate, isToday, prevDay, nextDay,
     showAllocate, setShowAllocate, allocForm, setAllocForm,
     selectedSalesman, openAllocate,
@@ -44,9 +44,9 @@ export default function Allocation() {
     reconcile, isReconciling, reconcileError,
   } = useAllocation();
 
-  const activeSalesmen  = salesmen.filter(s => s.is_active).length;
-  const totalAllocated  = salesmen.reduce((s, sm) => s + (sm.allocations?.reduce((a, al) => a + (parseInt(al.qty) || 0), 0) || 0), 0);
-  const totalCollected  = salesmen.reduce((s, sm) => s + (sm.allocations?.reduce((a, al) => a + parseFloat(al.collected_amount || 0), 0) || 0), 0);
+  const activeSalesmen = allocationSummary.active_count    ?? 0;
+  const totalAllocated = allocationSummary.total_allocated ?? 0;
+  const totalCollected = allocationSummary.total_collected ?? 0;
 
   if (isLoading) return <LoadingSpinner text={t('common.loading')} />;
 

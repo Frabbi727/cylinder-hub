@@ -44,7 +44,14 @@ class SalesmanController extends Controller
             ];
         });
 
-        return $this->success($salesmen);
+        return $this->success([
+            'salesmen' => $salesmen,
+            'summary'  => [
+                'active_count'    => $salesmen->where('is_active', true)->count(),
+                'total_allocated' => (int) $salesmen->sum(fn ($sm) => $sm->alloc_stats['total_allocated'] ?? 0),
+                'total_collected' => (float) $salesmen->sum(fn ($sm) => $sm->alloc_stats['collected_amount'] ?? 0),
+            ],
+        ]);
     }
 
     public function show(User $user): JsonResponse

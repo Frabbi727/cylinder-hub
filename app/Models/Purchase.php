@@ -9,6 +9,8 @@ class Purchase extends Model
 {
     use SoftDeletes;
 
+    protected $appends = ['total_qty', 'total_remaining_qty'];
+
     protected $fillable = [
         'supplier_id', 'recorded_by', 'purchase_date',
         'total_amount', 'paid_amount', 'due_amount', 'notes',
@@ -22,6 +24,18 @@ class Purchase extends Model
             'paid_amount' => 'decimal:2',
             'due_amount' => 'decimal:2',
         ];
+    }
+
+    public function getTotalQtyAttribute(): int
+    {
+        if (! $this->relationLoaded('items')) return 0;
+        return (int) $this->items->sum('qty');
+    }
+
+    public function getTotalRemainingQtyAttribute(): int
+    {
+        if (! $this->relationLoaded('items')) return 0;
+        return (int) $this->items->sum('remaining_qty');
     }
 
     public function supplier()

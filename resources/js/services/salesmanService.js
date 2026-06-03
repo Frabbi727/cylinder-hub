@@ -1,6 +1,6 @@
 import api from './api';
 export const salesmanService = {
-  getAll:          (date)          => api.get('/salesmen', { params: date ? { date } : {} }).then(r => r.data.data),
+  getAll:          (date)          => api.get('/salesmen', { params: date ? { date } : {} }).then(r => r.data.data), // returns {salesmen, summary}
   getById:         (id)            => api.get(`/salesmen/${id}`).then(r => r.data),
   getReport:       (id, from, to)  => api.get(`/salesmen/${id}/report`, { params: { from, to } }).then(r => r.data),
   getCylinderFlow: (id, from, to)  => api.get(`/salesmen/${id}/cylinder-flow`, { params: { from, to } }).then(r => r.data),

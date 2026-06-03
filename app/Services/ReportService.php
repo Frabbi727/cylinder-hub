@@ -256,10 +256,12 @@ class ReportService
         $totalReturned = (int) StockAllocation::where('salesman_id', $salesmanId)
             ->whereBetween('allocation_date', [$from, $to])->sum('returned_qty');
 
-        $totalRevenue       = (float) Sale::where('salesman_id', $salesmanId)
-            ->whereBetween('sale_date', [$from, $to])->sum('total_amount');
-        $totalCashCollected = (float) Sale::where('salesman_id', $salesmanId)
-            ->whereBetween('sale_date', [$from, $to])->sum('paid_amount');
+        $sales = Sale::where('salesman_id', $salesmanId)
+            ->whereBetween('sale_date', [$from, $to])
+            ->get();
+
+        $totalRevenue       = (float) $sales->sum('total_amount');
+        $totalCashCollected = (float) $sales->sum('paid_amount');
         $totalDuesCreated   = round($totalRevenue - $totalCashCollected, 2);
 
         $totalDuesCollected = (float) DueCollection::where('collected_by', $salesmanId)
@@ -286,6 +288,12 @@ class ReportService
             'total_dues_collected' => round($totalDuesCollected, 2),
             'still_outstanding'    => $stillOutstanding,
             'sell_through_rate'    => $sellThroughRate,
+            'pay_breakdown'        => $sales->groupBy('payment_type')
+                ->map->count()
+                ->toArray(),
+            'daily_revenue'        => $sales->groupBy('sale_date')
+                ->map(fn ($group) => round((float) $group->sum('total_amount'), 2))
+                ->toArray(),
         ];
     }
 }

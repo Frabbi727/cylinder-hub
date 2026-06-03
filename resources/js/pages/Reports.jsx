@@ -57,21 +57,11 @@ export default function Reports() {
   const flow     = flowData?.data;
   const flowCyls = flow?.by_cylinder || [];
 
-  // Payment type breakdown for pie chart
-  const payBreakdown = sales.reduce((acc, s) => {
-    const type = s.payment_type || 'due';
-    acc[type] = (acc[type] || 0) + 1;
-    return acc;
-  }, {});
-  const pieData = Object.entries(payBreakdown).map(([name, value]) => ({ name, value }));
+  // Payment type breakdown — from backend report
+  const pieData = Object.entries(report?.pay_breakdown || {}).map(([name, value]) => ({ name, value }));
 
-  // Daily revenue for bar chart (group by date)
-  const dailyRevenue = sales.reduce((acc, s) => {
-    const d = s.sale_date;
-    acc[d] = (acc[d] || 0) + parseFloat(s.total_amount || 0);
-    return acc;
-  }, {});
-  const barData = Object.entries(dailyRevenue)
+  // Daily revenue — from backend report
+  const barData = Object.entries(report?.daily_revenue || {})
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, revenue]) => ({ date: date.slice(5), revenue }));
 

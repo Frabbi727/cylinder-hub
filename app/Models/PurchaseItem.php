@@ -9,6 +9,8 @@ class PurchaseItem extends Model
 {
     use SoftDeletes;
 
+    protected $appends = ['line_total'];
+
     protected $fillable = [
         'purchase_id', 'cylinder_id', 'unit_cost', 'qty', 'remaining_qty', 'status',
     ];
@@ -18,6 +20,11 @@ class PurchaseItem extends Model
         return [
             'unit_cost' => 'decimal:2',
         ];
+    }
+
+    public function getLineTotalAttribute(): float
+    {
+        return round($this->qty * $this->unit_cost, 2);
     }
 
     public function purchase()

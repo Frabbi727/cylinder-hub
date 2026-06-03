@@ -36,7 +36,7 @@ export function useAllocation() {
   const [salesmanForm,  setSalesmanForm]  = useState(SALESMAN_FORM_DEFAULT);
   const [reconcileForm, setReconcileForm] = useState(RECONCILE_FORM_DEFAULT);
 
-  const { data: salesmen, isLoading } = useQuery({
+  const { data: salesmenData, isLoading } = useQuery({
     queryKey: ['salesmen', viewDate],
     queryFn:  () => salesmanService.getAll(viewDate),
     refetchInterval: 30_000,
@@ -123,7 +123,8 @@ export function useAllocation() {
   };
 
   return {
-    salesmen:   Array.isArray(salesmen) ? salesmen : [],
+    salesmen:          salesmenData?.salesmen || [],
+    allocationSummary: salesmenData?.summary  || {},
     cylinders:  Array.isArray(cylinders) ? cylinders : (cylinders?.data || []),
     isLoading,
     viewDate, setViewDate, isToday, prevDay, nextDay,

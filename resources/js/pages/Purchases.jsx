@@ -174,7 +174,7 @@ export default function Purchases() {
                     </td>
                     <td className="dim tiny">{p.purchase_date}</td>
                     <td style={{ fontWeight:600 }}>{p.supplier?.name}</td>
-                    <td>{p.items?.reduce((s, it) => s + it.qty, 0)} {t('common.pcs')}</td>
+                    <td>{p.total_qty ?? 0} {t('common.pcs')}</td>
                     <td style={{ fontWeight:600, textAlign:'right' }}>{TK(p.total_amount)}</td>
                     <td style={{ color:'var(--success)', textAlign:'right' }}>{TK(p.paid_amount)}</td>
                     <td style={{ color: p.due_amount > 0 ? 'var(--accent)' : 'inherit', fontWeight: p.due_amount > 0 ? 700 : 400, textAlign:'right' }}>
@@ -235,7 +235,7 @@ export default function Purchases() {
                                     {it.remaining_qty} {t('common.pcs')}
                                   </td>
                                   <td style={{ padding:'8px 10px', textAlign:'right', fontWeight:600 }}>
-                                    {TK(it.qty * it.unit_cost)}
+                                    {TK(it.line_total)}
                                   </td>
                                   <td style={{ padding:'8px 10px', textAlign:'center' }}>
                                     <StatusPill status={it.status} />
@@ -247,10 +247,10 @@ export default function Purchases() {
                               <tr style={{ background:'var(--primary-soft)' }}>
                                 <td colSpan={3} style={{ padding:'8px 10px', fontWeight:600, fontSize:12 }}>{t('common.total')}</td>
                                 <td style={{ padding:'8px 10px', textAlign:'right', fontWeight:700 }}>
-                                  {p.items?.reduce((s, it) => s + it.qty, 0)} {t('common.pcs')}
+                                  {p.total_qty ?? 0} {t('common.pcs')}
                                 </td>
                                 <td style={{ padding:'8px 10px', textAlign:'right', fontWeight:700, color:'var(--primary)' }}>
-                                  {p.items?.reduce((s, it) => s + it.remaining_qty, 0)} {t('common.pcs')}
+                                  {p.total_remaining_qty ?? 0} {t('common.pcs')}
                                 </td>
                                 <td style={{ padding:'8px 10px', textAlign:'right', fontWeight:700, color:'var(--primary)' }}>
                                   {TK(p.total_amount)}

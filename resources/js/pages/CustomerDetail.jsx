@@ -59,9 +59,9 @@ export default function CustomerDetail() {
   const empties     = emptiesData?.data?.balances || [];
   const totalPending= emptiesData?.data?.total_pending || 0;
 
-  const totalRevenue = custSales.reduce((s, x) => s + parseFloat(x.total_amount || 0), 0);
-  const totalPaid    = custSales.reduce((s, x) => s + parseFloat(x.paid_amount || 0), 0);
-  const totalDue     = custSales.reduce((s, x) => s + parseFloat(x.due_amount || 0), 0);
+  const totalRevenue = customer?.total_revenue ?? 0;
+  const totalPaid    = customer?.total_paid    ?? 0;
+  const totalDue     = customer?.total_due     ?? 0;
 
   const TABS = [
     { key: 'sales',    label: 'Sales History' },

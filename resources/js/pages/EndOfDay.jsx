@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { salesmanService } from '../services/salesmanService';
@@ -158,14 +158,13 @@ export default function EndOfDay() {
 
   const allocations    = myData?.data?.salesman?.allocations || [];
   const allReconciled  = allocations.length > 0 && allocations.every(a => a.is_reconciled);
-
-  const stats = useMemo(() => {
-    const totalSold      = allocations.reduce((s, a) => s + (a.sold_qty || 0), 0);
-    const totalReturned  = allocations.reduce((s, a) => s + (a.returned_qty || 0), 0);
-    const totalCash      = allocations.reduce((s, a) => s + parseFloat(a.collected_amount || 0), 0);
-    const totalAllocated = allocations.reduce((s, a) => s + a.qty, 0);
-    return { totalSold, totalReturned, totalCash, totalAllocated };
-  }, [allocations]);
+  const apiStats       = myData?.data?.stats ?? {};
+  const stats = {
+    totalSold:      apiStats.total_sold      ?? 0,
+    totalReturned:  apiStats.total_returned  ?? 0,
+    totalCash:      apiStats.cash_collected  ?? 0,
+    totalAllocated: apiStats.total_allocated ?? 0,
+  };
 
   if (isLoading) return <LoadingSpinner text="Loading allocations..." />;
 

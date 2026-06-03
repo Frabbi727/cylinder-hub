@@ -37,7 +37,10 @@ class CustomerController extends Controller
 
     public function show(Customer $customer): JsonResponse
     {
-        return $this->success($customer->load(['sales', 'dueCollections']));
+        $customer->load(['sales', 'dueCollections']);
+        $customer->total_revenue = (float) $customer->sales->sum('total_amount');
+        $customer->total_paid    = (float) $customer->sales->sum('paid_amount');
+        return $this->success($customer);
     }
 
     public function update(StoreCustomerRequest $request, Customer $customer): JsonResponse
