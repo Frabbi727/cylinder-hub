@@ -58,22 +58,23 @@ class AllocationService
         }
 
         return DB::transaction(function () use ($allocation, $soldQty, $returnedQty, $collectedAmount) {
+            // returnedQty = unsold FILLED cylinders explicitly handed back to warehouse
+            // unsold      = any remainder not explicitly returned (also filled, also goes back)
+            // Empty shells from customers are tracked separately via cylinder_returns and are
+            // already added to empty_qty when logged — do NOT add them here again.
             $unsold = max(0, $allocation->qty - $soldQty - $returnedQty);
+            $totalFilledBack = $returnedQty + $unsold;
 
-            if ($unsold > 0) {
-                $this->stockService->addFilledStock($allocation->cylinder_id, $unsold);
+            if ($totalFilledBack > 0) {
+                $this->stockService->addFilledStock($allocation->cylinder_id, $totalFilledBack);
                 $this->movements->record(
                     $allocation->cylinder_id,
                     'eod_return',
-                    $unsold,
+                    $totalFilledBack,
                     auth()->id(),
                     $allocation->id,
-                    "EOD reconcile #{$allocation->id} — {$unsold} unsold units returned to stock"
+                    "EOD #{$allocation->id} — {$soldQty} sold, {$returnedQty} returned, {$unsold} auto-unsold → {$totalFilledBack} filled back to stock"
                 );
-            }
-
-            if ($returnedQty > 0) {
-                $this->stockService->addEmptyStock($allocation->cylinder_id, $returnedQty);
             }
 
             $allocation->update([

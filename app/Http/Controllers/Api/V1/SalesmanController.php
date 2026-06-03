@@ -78,18 +78,20 @@ class SalesmanController extends Controller
 
         $data = $request->validate([
             'sold_qty'         => 'required|integer|min:0',
-            'returned_qty'     => 'required|integer|min:0',
             'collected_amount' => 'required|numeric|min:0',
         ]);
 
-        if ($data['sold_qty'] + $data['returned_qty'] > $allocation->qty) {
-            abort(422, 'Sold ('.$data['sold_qty'].') + returned ('.$data['returned_qty'].') cannot exceed allocated quantity ('.$allocation->qty.').');
+        if ($data['sold_qty'] > $allocation->qty) {
+            abort(422, 'Sold ('.$data['sold_qty'].') cannot exceed allocated quantity ('.$allocation->qty.').');
         }
+
+        // All unsold cylinders automatically return to warehouse — no manual entry needed
+        $returnedQty = $allocation->qty - $data['sold_qty'];
 
         $allocation = $this->allocationService->reconcile(
             $allocation,
             $data['sold_qty'],
-            $data['returned_qty'],
+            $returnedQty,
             $data['collected_amount']
         );
 

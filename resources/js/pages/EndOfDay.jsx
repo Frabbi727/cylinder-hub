@@ -1,11 +1,10 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { salesmanService } from '../services/salesmanService';
-import { stockService } from '../services/stockService';
 import CylBadge from '../components/ui/CylBadge';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
-import { CheckCircle, AlertCircle, Moon, Info } from 'lucide-react';
+import { CheckCircle, AlertCircle, Moon } from 'lucide-react';
 
 const TK      = (n) => '৳' + Number(n || 0).toLocaleString('en-US');
 const todayStr = new Date().toISOString().split('T')[0];
@@ -14,33 +13,10 @@ const today    = new Date().toLocaleDateString('en-US', { weekday: 'long', year:
 function ReconcileForm({ alloc, onSuccess, onCancel }) {
   const qc = useQueryClient();
   const [form, setForm] = useState({
-    sold_qty:         String(alloc.sold_qty     ?? 0),
-    returned_qty:     String(alloc.returned_qty ?? 0),
+    sold_qty:         String(alloc.sold_qty ?? 0),
     collected_amount: String(alloc.collected_amount ?? ''),
   });
   const [error, setError] = useState('');
-
-  // Fetch logged returns for this allocation to pre-fill returned_qty
-  const { data: returnsData } = useQuery({
-    queryKey: ['allocation-returns', alloc.id],
-    queryFn:  () => stockService.getReturns({ allocation_id: alloc.id }),
-    enabled:  !!alloc.id,
-  });
-
-  const loggedReturns = returnsData?.data || [];
-  const loggedNormal  = loggedReturns.filter(r => !r.is_extra);
-  const loggedExtra   = loggedReturns.filter(r => r.is_extra && r.is_verified !== false);
-  const loggedTotal   = loggedReturns
-    .filter(r => r.is_verified !== false)
-    .reduce((s, r) => s + (r.qty || 0), 0);
-  const hasLoggedReturns = loggedTotal > 0;
-
-  // Pre-fill returned_qty once returns are loaded (only if field is still at default)
-  useEffect(() => {
-    if (hasLoggedReturns && form.returned_qty === String(alloc.returned_qty ?? 0)) {
-      setForm(f => ({ ...f, returned_qty: String(loggedTotal) }));
-    }
-  }, [loggedTotal]); // eslint-disable-line
 
   const reconcileMutation = useMutation({
     mutationFn: (data) => salesmanService.reconcile(alloc.id, data),
@@ -51,27 +27,52 @@ function ReconcileForm({ alloc, onSuccess, onCancel }) {
     onError: (e) => setError(e.response?.data?.message || 'Failed to reconcile'),
   });
 
-  const sold      = parseInt(form.sold_qty)     || 0;
-  const returned  = parseInt(form.returned_qty) || 0;
-  const unsold    = Math.max(0, alloc.qty - sold - returned);
-  const overLimit = sold + returned > alloc.qty;
+  const sold         = parseInt(form.sold_qty) || 0;
+  const autoReturned = Math.max(0, alloc.qty - sold);
+  const overLimit    = sold > alloc.qty;
+  const expectedCash = sold * parseFloat(alloc.sale_price || 0);
+
+  // Auto-fill cash whenever sold qty changes
+  const handleSoldChange = (val) => {
+    const qty  = parseInt(val) || 0;
+    const cash = qty * parseFloat(alloc.sale_price || 0);
+    setForm(f => ({ ...f, sold_qty: val, collected_amount: String(cash) }));
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (overLimit) { setError(`Sold (${sold}) + returned (${returned}) cannot exceed allocated (${alloc.qty}).`); return; }
+    if (overLimit) { setError(`Sold (${sold}) cannot exceed allocated (${alloc.qty}).`); return; }
     setError('');
-    reconcileMutation.mutate({ sold_qty: sold, returned_qty: returned, collected_amount: parseFloat(form.collected_amount) || 0 });
+    reconcileMutation.mutate({
+      sold_qty:         sold,
+      collected_amount: parseFloat(form.collected_amount) || 0,
+    });
   };
 
   return (
     <div style={{ background: 'var(--bg)', borderRadius: 10, padding: 20, border: '1px dashed var(--primary)', marginTop: 12 }}>
-      <div style={{ fontWeight: 700, marginBottom: 12, color: 'var(--primary)' }}>Reconcile: {alloc.cylinder?.name} {alloc.cylinder?.size}</div>
+      <div style={{ fontWeight: 700, marginBottom: 12, color: 'var(--primary)' }}>
+        Reconcile: {alloc.cylinder?.name} {alloc.cylinder?.size}
+      </div>
 
       {/* Allocation summary */}
-      <div style={{ background: 'var(--surface)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', gap: 20 }}>
-        <div><div style={{ fontWeight: 700, fontSize: 18 }}>{alloc.qty}</div><div style={{ fontSize: 11, color: 'var(--text-3)' }}>Allocated</div></div>
-        <div><div style={{ fontWeight: 700, fontSize: 18, color: 'var(--success)' }}>{alloc.sold_qty || 0}</div><div style={{ fontSize: 11, color: 'var(--text-3)' }}>Recorded sold</div></div>
-        <div><div style={{ fontWeight: 700, fontSize: 18, color: 'var(--primary)' }}>{TK(alloc.sale_price)}</div><div style={{ fontSize: 11, color: 'var(--text-3)' }}>Sale price</div></div>
+      <div style={{ background: 'var(--surface)', borderRadius: 8, padding: '12px 16px', marginBottom: 16, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontWeight: 800, fontSize: 22 }}>{alloc.qty}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Allocated</div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontWeight: 800, fontSize: 22, color: 'var(--success)' }}>{alloc.sold_qty || 0}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Sales recorded</div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontWeight: 800, fontSize: 22, color: 'var(--primary)' }}>{TK(alloc.sale_price)}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Price/pcs</div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontWeight: 800, fontSize: 22, color: '#A85200' }}>{TK(expectedCash)}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Expected cash ({sold} × {TK(alloc.sale_price)})</div>
+        </div>
       </div>
 
       {error && (
@@ -81,49 +82,58 @@ function ReconcileForm({ alloc, onSuccess, onCancel }) {
       )}
 
       <form onSubmit={handleSubmit}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+          {/* Field 1: Sold qty */}
           <div>
-            <label className="label">Actual Sold *</label>
+            <label className="label">How many did you sell? *</label>
             <input type="number" className="input" min="0" max={alloc.qty}
-              value={form.sold_qty} onChange={e => setForm(f => ({ ...f, sold_qty: e.target.value }))} required />
-            <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>Recorded: {alloc.sold_qty || 0}</div>
-          </div>
-          <div>
-            <label className="label">Empties Returned *</label>
-            <input type="number" className="input" min="0"
-              value={form.returned_qty} onChange={e => setForm(f => ({ ...f, returned_qty: e.target.value }))} required />
-            {hasLoggedReturns && (
-              <div style={{ marginTop: 4, fontSize: 11, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <Info size={11} />
-                {loggedTotal} logged ({loggedNormal.length > 0 ? `${loggedNormal.reduce((s,r)=>s+r.qty,0)} normal` : ''}
-                {loggedNormal.length > 0 && loggedExtra.length > 0 ? ' + ' : ''}
-                {loggedExtra.length > 0 ? `${loggedExtra.reduce((s,r)=>s+r.qty,0)} extra` : ''})
-                {parseInt(form.returned_qty) !== loggedTotal && (
-                  <span style={{ color: '#A85200', marginLeft: 4 }}>⚠ differs from logged</span>
-                )}
-              </div>
-            )}
-          </div>
-          <div>
-            <label className="label">Cash Submitted ৳ *</label>
-            <input type="number" className="input" min="0" step="0.01"
-              value={form.collected_amount} onChange={e => setForm(f => ({ ...f, collected_amount: e.target.value }))} required />
+              value={form.sold_qty}
+              onChange={e => handleSoldChange(e.target.value)}
+              required />
             <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
-              Expected: {TK((alloc.sold_qty || 0) * parseFloat(alloc.sale_price || 0))}
+              Max: {alloc.qty} · Price: {TK(alloc.sale_price)}/pcs
+            </div>
+          </div>
+
+          {/* Field 2: Cash — auto-filled, salesman can adjust if needed */}
+          <div>
+            <label className="label">Cash submitted ৳ *</label>
+            <input type="number" className="input" min="0" step="0.01"
+              value={form.collected_amount}
+              onChange={e => setForm(f => ({ ...f, collected_amount: e.target.value }))}
+              required />
+            <div style={{ fontSize: 11, color: expectedCash === parseFloat(form.collected_amount || 0) ? 'var(--success)' : '#A85200', marginTop: 4, fontWeight: 500 }}>
+              {expectedCash === parseFloat(form.collected_amount || 0)
+                ? `✓ Matches: ${sold} × ${TK(alloc.sale_price)}`
+                : `Expected: ${TK(expectedCash)} — adjust if partial collected`}
             </div>
           </div>
         </div>
 
-        {/* Preview */}
-        {form.sold_qty !== '' && (
-          <div style={{ background: 'var(--surface)', borderRadius: 8, padding: '10px 14px', marginBottom: 12 }}>
-            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>After reconciliation:</div>
-            <div style={{ display: 'flex', gap: 20, fontSize: 13 }}>
-              <span>Unsold: <strong style={{ color: unsold > 0 ? 'var(--warning)' : 'var(--success)' }}>{unsold} pcs</strong> (returns to stock)</span>
-              {overLimit && <span style={{ color: 'var(--error)', fontWeight: 600 }}>⚠ Exceeds allocation!</span>}
+        {/* Auto-calculated summary — read only */}
+        <div style={{ background: 'var(--surface)', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 10, fontWeight: 600 }}>
+            Automatic calculation:
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, textAlign: 'center' }}>
+            <div style={{ background: '#E6F8EC', borderRadius: 8, padding: '10px 8px' }}>
+              <div style={{ fontWeight: 800, fontSize: 20, color: '#176B3A' }}>{sold}</div>
+              <div style={{ fontSize: 11, color: '#176B3A', marginTop: 2 }}>Sold ✓</div>
+            </div>
+            <div style={{ background: '#FFF1DD', borderRadius: 8, padding: '10px 8px' }}>
+              <div style={{ fontWeight: 800, fontSize: 20, color: '#A85200' }}>{autoReturned}</div>
+              <div style={{ fontSize: 11, color: '#A85200', marginTop: 2 }}>Return to warehouse</div>
+            </div>
+            <div style={{ background: overLimit ? '#FFE5E3' : '#E6F0F1', borderRadius: 8, padding: '10px 8px' }}>
+              <div style={{ fontWeight: 800, fontSize: 20, color: overLimit ? '#B83030' : 'var(--primary)' }}>
+                {overLimit ? '⚠' : '✓'}
+              </div>
+              <div style={{ fontSize: 11, color: overLimit ? '#B83030' : 'var(--primary)', marginTop: 2 }}>
+                {overLimit ? 'Exceeds limit!' : `${sold} + ${autoReturned} = ${alloc.qty}`}
+              </div>
             </div>
           </div>
-        )}
+        </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button type="button" className="btn btn-ghost" onClick={onCancel}>Cancel</button>

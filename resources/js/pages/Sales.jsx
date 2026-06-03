@@ -114,7 +114,7 @@ export default function Sales() {
   const [emptySuccess, setEmptySuccess] = useState('');
   const [showReconcile,setShowReconcile]= useState(false);
   const [reconcileAlloc,setReconcileAlloc] = useState(null);
-  const [reconcileForm,setReconcileForm]= useState({ sold_qty:'', returned_qty:'', collected_amount:'' });
+  const [reconcileForm,setReconcileForm]= useState({ sold_qty:'', collected_amount:'' });
   const [reconcileErr, setReconcileErr] = useState('');
 
   // Salesman's today allocations (incl. reconciled for display)
@@ -185,8 +185,7 @@ export default function Sales() {
   const openReconcile = (alloc) => {
     setReconcileAlloc(alloc);
     setReconcileForm({
-      sold_qty:         String(alloc.sold_qty     ?? 0),
-      returned_qty:     String(alloc.returned_qty ?? 0),
+      sold_qty:         String(alloc.sold_qty ?? 0),
       collected_amount: String(alloc.collected_amount ?? ''),
     });
     reconcileMutation.reset();
@@ -436,41 +435,42 @@ export default function Sales() {
           </div>
           <form onSubmit={e => {
             e.preventDefault();
-            const sold     = parseInt(reconcileForm.sold_qty)     || 0;
-            const returned = parseInt(reconcileForm.returned_qty) || 0;
-            const collected= parseFloat(reconcileForm.collected_amount) || 0;
-            if (sold + returned > reconcileAlloc.qty) {
-              setReconcileErr(`Sold (${sold}) + returned (${returned}) cannot exceed allocated (${reconcileAlloc.qty}).`);
+            const sold      = parseInt(reconcileForm.sold_qty) || 0;
+            const collected = parseFloat(reconcileForm.collected_amount) || 0;
+            if (sold > reconcileAlloc.qty) {
+              setReconcileErr(`Sold (${sold}) cannot exceed allocated (${reconcileAlloc.qty}).`);
               return;
             }
-            reconcileMutation.mutate({ allocationId: reconcileAlloc.id, data: { sold_qty: sold, returned_qty: returned, collected_amount: collected } });
+            reconcileMutation.mutate({ allocationId: reconcileAlloc.id, data: { sold_qty: sold, collected_amount: collected } });
           }}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
               <div>
                 <label className="label">{t('allocation.actualSoldQty')} *</label>
                 <input type="number" className="input" min="0" max={reconcileAlloc.qty}
-                  value={reconcileForm.sold_qty} onChange={e => setReconcileForm(f => ({...f, sold_qty: e.target.value}))} required />
-                <div className="dim tiny" style={{ marginTop:4 }}>Max: {reconcileAlloc.qty}</div>
+                  value={reconcileForm.sold_qty}
+                  onChange={e => {
+                    const qty  = parseInt(e.target.value) || 0;
+                    const cash = qty * parseFloat(reconcileAlloc.sale_price || 0);
+                    setReconcileForm(f => ({ ...f, sold_qty: e.target.value, collected_amount: String(cash) }));
+                  }} required />
+                <div className="dim tiny" style={{ marginTop:4 }}>Max: {reconcileAlloc.qty} · {TK(reconcileAlloc.sale_price)}/pcs</div>
               </div>
               <div>
-                <label className="label">{t('allocation.emptyCylindersReturned')} *</label>
-                <input type="number" className="input" min="0"
-                  value={reconcileForm.returned_qty} onChange={e => setReconcileForm(f => ({...f, returned_qty: e.target.value}))} required />
+                <label className="label">{t('allocation.cashCollected')} *</label>
+                <input type="number" className="input" min="0" step="0.01"
+                  value={reconcileForm.collected_amount}
+                  onChange={e => setReconcileForm(f => ({...f, collected_amount: e.target.value}))} required />
+                <div className="dim tiny" style={{ marginTop:4 }}>
+                  Expected: {TK((parseInt(reconcileForm.sold_qty)||0) * parseFloat(reconcileAlloc.sale_price||0))}
+                </div>
               </div>
-            </div>
-            <div style={{ marginBottom:12 }}>
-              <label className="label">{t('allocation.cashCollected')} *</label>
-              <input type="number" className="input" min="0" step="0.01"
-                value={reconcileForm.collected_amount} onChange={e => setReconcileForm(f => ({...f, collected_amount: e.target.value}))} required />
             </div>
             {reconcileForm.sold_qty !== '' && (
               <div style={{ background:'var(--bg)', borderRadius:8, padding:'10px 14px', marginBottom:12 }}>
                 <div className="dim tiny" style={{ marginBottom:4 }}>{t('allocation.afterReconcile')}</div>
-                <div>
-                  <span style={{ fontWeight:600 }}>
-                    {Math.max(0, reconcileAlloc.qty - (parseInt(reconcileForm.sold_qty)||0) - (parseInt(reconcileForm.returned_qty)||0))}
-                  </span>
-                  <span className="dim tiny"> {t('allocation.unsoldWillRestore')}</span>
+                <div style={{ display:'flex', gap:16 }}>
+                  <span><span style={{ fontWeight:600, color:'var(--success)' }}>{parseInt(reconcileForm.sold_qty)||0}</span> <span className="dim tiny">sold</span></span>
+                  <span><span style={{ fontWeight:600, color:'#A85200' }}>{Math.max(0, reconcileAlloc.qty - (parseInt(reconcileForm.sold_qty)||0))}</span> <span className="dim tiny">return to warehouse</span></span>
                 </div>
               </div>
             )}

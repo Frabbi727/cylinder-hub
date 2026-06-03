@@ -102,10 +102,10 @@ export default function SalesmanDashboard() {
 
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12, marginBottom: 24 }}>
-        <StatCard4 icon={Package}      label="Total Allocated" value={`${stats.totalAllocated} pcs`} sub="Today's load"         tone="primary" />
-        <StatCard4 icon={ShoppingCart} label="Total Sold"      value={`${stats.totalSold} pcs`}      sub="From today's sales"   tone="success" />
-        <StatCard4 icon={DollarSign}   label="Cash Collected"  value={TK(stats.cashCollected)}        sub="Today's payments"     tone="warning" />
-        <StatCard4 icon={AlertCircle}  label="Outstanding Dues" value={TK(totalDues)}                sub={`${duesCount} sales due`} tone="danger" />
+        <StatCard4 icon={Package}      label="Total Allocated" value={`${stats.totalAllocated} pcs`} sub="Cylinders with you"             tone="primary" />
+        <StatCard4 icon={ShoppingCart} label="Total Sold"      value={`${stats.totalSold} pcs`}      sub="Sold so far today"              tone="success" />
+        <StatCard4 icon={DollarSign}   label="Cash Collected"  value={TK(stats.cashCollected)}        sub="Today's payments received"      tone="warning" />
+        <StatCard4 icon={AlertCircle}  label="Outstanding Dues" value={TK(totalDues)}                sub={`${duesCount} sales due`}       tone="danger" />
       </div>
 
       {/* Today's allocations */}
@@ -147,10 +147,11 @@ export default function SalesmanDashboard() {
                     <div style={{ width: `${soldPct}%`, height: '100%', background: 'var(--success)', transition: 'width 0.3s' }} />
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', fontSize: 11, textAlign: 'center' }}>
-                    {[[a.qty, 'Alloc', 'var(--text-1)'], [a.sold_qty || 0, 'Sold', 'var(--success)'], [a.returned_qty || 0, 'Ret.', 'var(--warning)'], [remaining, 'With You', 'var(--primary)']].map(([v, l, c]) => (
+                    {[[a.qty, 'Allocated', 'var(--text-1)', null], [a.sold_qty || 0, 'Sold', 'var(--success)', null], [a.returned_qty || 0, 'Returned', 'var(--warning)', null], [remaining, 'With You', remaining > 0 ? 'var(--primary)' : 'var(--text-3)', remaining > 0 ? 'can sell' : null]].map(([v, l, c, sub]) => (
                       <div key={l}>
                         <div style={{ fontWeight: 700, color: c, fontSize: 14 }}>{v}</div>
-                        <div style={{ color: 'var(--text-3)', marginTop: 1 }}>{l}</div>
+                        <div style={{ color: 'var(--text-3)', marginTop: 1, fontSize: 10 }}>{l}</div>
+                        {sub && <div style={{ color: 'var(--primary)', fontSize: 10, fontWeight: 600 }}>{sub}</div>}
                       </div>
                     ))}
                   </div>

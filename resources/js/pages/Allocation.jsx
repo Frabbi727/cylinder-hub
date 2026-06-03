@@ -161,6 +161,11 @@ export default function Allocation() {
                           <div className="dim tiny">
                             {alloc.qty} {t('allocation.allocatedLabel')} · {alloc.sold_qty||0} {t('allocation.sold')} · {alloc.returned_qty||0} {t('allocation.returned')}
                             {alloc.sale_price > 0 && <span> · {TK(alloc.sale_price)}/{t('common.pcs')}</span>}
+                            {alloc.allocation_date && alloc.allocation_date < todayStr && (
+                              <span style={{ marginLeft: 6, color: '#A85200', fontWeight: 600 }}>
+                                · carry-over {alloc.allocation_date}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -183,14 +188,16 @@ export default function Allocation() {
 
               <div style={{ display:'flex', justifyContent:'space-between' }}>
                 {[
-                  [t('allocation.allocated'), totalAllocQty,  'var(--text-1)'],
-                  [t('allocation.sold'),      totalSoldQty,   'var(--success)'],
-                  [t('allocation.returned'),  totalRetQty,    'var(--warning)'],
-                  [t('allocation.withHim'),   withSalesman,   'var(--primary)'],
-                ].map(([label, value, color]) => (
+                  [t('allocation.allocated'), totalAllocQty, 'var(--text-1)', null],
+                  [t('allocation.sold'),      totalSoldQty,  'var(--success)', null],
+                  [t('allocation.returned'),  totalRetQty,   'var(--warning)', null],
+                  ['With Him', withSalesman,  withSalesman > 0 ? 'var(--primary)' : 'var(--text-3)',
+                   withSalesman > 0 ? 'can still sell' : null],
+                ].map(([label, value, color, sub]) => (
                   <div key={label} style={{ textAlign:'center' }}>
                     <div style={{ fontSize:18, fontWeight:700, color }}>{value}</div>
                     <div className="dim tiny">{label}</div>
+                    {sub && <div style={{ fontSize: 10, color: 'var(--primary)', fontWeight: 600, marginTop: 2 }}>{sub}</div>}
                   </div>
                 ))}
               </div>

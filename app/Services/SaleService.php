@@ -25,9 +25,11 @@ class SaleService
         return DB::transaction(function () use ($data) {
             if (($data['salesman_role'] ?? null) === 'salesman') {
                 foreach ($data['items'] as $item) {
+                    // Check all unreconciled allocations up to and including the sale date
+                    // so carry-over stock from previous days can still be sold
                     $available = StockAllocation::where('salesman_id', $data['salesman_id'])
                         ->where('cylinder_id', $item['cylinder_id'])
-                        ->whereDate('allocation_date', $data['sale_date'])
+                        ->whereDate('allocation_date', '<=', $data['sale_date'])
                         ->where('is_reconciled', false)
                         ->get()
                         ->sum(fn ($a) => max(0, $a->qty - $a->sold_qty - $a->returned_qty));
@@ -126,10 +128,12 @@ class SaleService
         }
 
         foreach ($qtyByCylinder as $cylinderId => $totalQty) {
+            // Consume from oldest allocation first (FIFO) so carry-over stock is used up first
             $allocations = StockAllocation::where('salesman_id', $salesmanId)
                 ->where('cylinder_id', $cylinderId)
-                ->whereDate('allocation_date', $saleDate)
+                ->whereDate('allocation_date', '<=', $saleDate)
                 ->where('is_reconciled', false)
+                ->orderBy('allocation_date', 'asc')
                 ->orderBy('created_at', 'asc')
                 ->get();
 
@@ -170,10 +174,12 @@ class SaleService
                 $qtyByCylinder[$cid] = ($qtyByCylinder[$cid] ?? 0) + $saleItem->qty;
             }
             foreach ($qtyByCylinder as $cylinderId => $totalQty) {
+                // When reversing a sale, give back to the most recent allocation first
                 $allocations = StockAllocation::where('salesman_id', $sale->salesman_id)
                     ->where('cylinder_id', $cylinderId)
-                    ->whereDate('allocation_date', $sale->sale_date)
+                    ->whereDate('allocation_date', '<=', $sale->sale_date)
                     ->where('is_reconciled', false)
+                    ->orderBy('allocation_date', 'desc')
                     ->orderBy('created_at', 'desc')
                     ->get();
 
