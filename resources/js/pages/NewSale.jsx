@@ -65,7 +65,7 @@ export default function NewSale() {
     const allocs = myData?.data?.salesman?.allocations || [];
     return allocs.reduce((acc, a) => {
       if (a.is_reconciled) return acc;
-      const remaining = Math.max(0, (a.qty || 0) - (a.sold_qty || 0) - (a.returned_qty || 0));
+      const remaining = a.with_salesman ?? 0;
       if (!acc[a.cylinder_id]) {
         acc[a.cylinder_id] = { cylinder: a.cylinder, remaining: 0, sale_price: a.sale_price || 0 };
       }

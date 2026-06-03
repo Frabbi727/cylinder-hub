@@ -107,11 +107,12 @@ export default function Allocation() {
         )}
         {salesmen.map(sm => {
           const allocs         = sm.allocations || [];
-          const totalAllocQty  = allocs.reduce((s, a) => s + (parseInt(a.qty)          || 0), 0);
-          const totalSoldQty   = allocs.reduce((s, a) => s + (parseInt(a.sold_qty)     || 0), 0);
-          const totalRetQty    = allocs.reduce((s, a) => s + (parseInt(a.returned_qty) || 0), 0);
-          const withSalesman   = Math.max(0, totalAllocQty - totalSoldQty - totalRetQty);
-          const collectedAmt   = allocs.reduce((s, a) => s + parseFloat(a.collected_amount||0), 0);
+          const stats          = sm.alloc_stats || {};
+          const totalAllocQty  = stats.total_allocated  ?? 0;
+          const totalSoldQty   = stats.total_sold       ?? 0;
+          const totalRetQty    = stats.total_returned   ?? 0;
+          const withSalesman   = stats.with_salesman    ?? 0;
+          const collectedAmt   = stats.collected_amount ?? 0;
 
           return (
             <div key={sm.id} className="card" style={{ opacity: sm.is_active ? 1 : 0.6 }}>

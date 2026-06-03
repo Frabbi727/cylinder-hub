@@ -57,19 +57,26 @@ class DashboardService
 
     public function getLiveStock(): array
     {
+        $withSalesmen = StockAllocation::where('is_reconciled', false)
+            ->get()
+            ->groupBy('cylinder_id')
+            ->map(fn ($group) => $group->sum(fn ($a) => max(0, $a->qty - $a->sold_qty - $a->returned_qty)));
+
         return CylinderStock::with('cylinder')
             ->get()
             ->map(fn ($s) => [
-                'cylinder_id' => $s->cylinder_id,
-                'name'        => $s->cylinder?->name,
-                'size'        => $s->cylinder?->size,
-                'short_code'  => $s->cylinder?->short_code,
-                'color1'      => $s->cylinder?->color1,
-                'color2'      => $s->cylinder?->color2,
-                'filled_qty'  => $s->filled_qty,
-                'empty_qty'   => $s->empty_qty,
-                'capacity'    => $s->capacity,
-                'reorder_level' => $s->cylinder?->reorder_level,
+                'cylinder_id'       => $s->cylinder_id,
+                'name'              => $s->cylinder?->name,
+                'size'              => $s->cylinder?->size,
+                'short_code'        => $s->cylinder?->short_code,
+                'color1'            => $s->cylinder?->color1,
+                'color2'            => $s->cylinder?->color2,
+                'filled_qty'        => $s->filled_qty,
+                'with_salesman_qty' => (int) ($withSalesmen[$s->cylinder_id] ?? 0),
+                'total_filled_qty'  => $s->filled_qty + (int) ($withSalesmen[$s->cylinder_id] ?? 0),
+                'empty_qty'         => $s->empty_qty,
+                'capacity'          => $s->capacity,
+                'reorder_level'     => $s->cylinder?->reorder_level,
             ])
             ->all();
     }

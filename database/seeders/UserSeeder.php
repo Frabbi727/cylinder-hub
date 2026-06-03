@@ -36,5 +36,6 @@ class UserSeeder extends Seeder
                 'is_active'       => true,
             ]);
         }
+
     }
 }

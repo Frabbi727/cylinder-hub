@@ -31,7 +31,20 @@ class SalesmanController extends Controller
             $query->where('is_active', true);
         }
 
-        return $this->success($query->orderBy('name')->get());
+        $salesmen = $query->orderBy('name')->get();
+
+        $salesmen->each(function ($sm) {
+            $allocs = $sm->allocations;
+            $sm->alloc_stats = [
+                'total_allocated'  => $allocs->sum('qty'),
+                'total_sold'       => $allocs->sum('sold_qty'),
+                'total_returned'   => $allocs->sum('returned_qty'),
+                'with_salesman'    => $allocs->sum('with_salesman'),
+                'collected_amount' => (float) $allocs->sum('collected_amount'),
+            ];
+        });
+
+        return $this->success($salesmen);
     }
 
     public function show(User $user): JsonResponse

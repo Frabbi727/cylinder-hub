@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class SaleItem extends Model
 {
+    protected $appends = ['line_total'];
+
     protected $fillable = [
         'sale_id', 'purchase_item_id', 'cylinder_id',
         'qty', 'unit_price', 'unit_cost', 'profit',
@@ -18,6 +20,11 @@ class SaleItem extends Model
             'unit_cost' => 'decimal:2',
             'profit' => 'decimal:2',
         ];
+    }
+
+    public function getLineTotalAttribute(): float
+    {
+        return round($this->qty * $this->unit_price, 2);
     }
 
     public function sale()

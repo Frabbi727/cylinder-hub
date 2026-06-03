@@ -119,11 +119,14 @@ export default function Dashboard() {
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                 <CylCell cylinder={s} />
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{s.filled_qty} {t('dashboard.filledLabel')}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{s.total_filled_qty} {t('dashboard.filledLabel')}</div>
+                  {s.with_salesman_qty > 0 && (
+                    <div className="dim tiny">{s.filled_qty} warehouse + {s.with_salesman_qty} out</div>
+                  )}
                   <div className="dim tiny">{s.empty_qty} {t('dashboard.emptyLabel')}</div>
                 </div>
               </div>
-              <StockBar filled={s.filled_qty} empty={s.empty_qty} capacity={s.capacity} />
+              <StockBar filled={s.total_filled_qty} empty={s.empty_qty} capacity={s.capacity} />
             </div>
           ))}
         </div>

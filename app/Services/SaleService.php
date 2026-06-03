@@ -44,8 +44,9 @@ class SaleService
                 }
             }
 
-            $totalAmount  = 0;
-            $allSaleItems = [];
+            $totalAmount    = 0;
+            $allSaleItems   = [];
+            $isSalesmanSale = ($data['salesman_role'] ?? null) === 'salesman';
 
             foreach ($data['items'] as $item) {
                 $fifoResult = $this->fifoService->consume(
@@ -54,7 +55,12 @@ class SaleService
                     (float) $item['unit_price']
                 );
 
-                $this->stockService->removeFilledStock($item['cylinder_id'], $item['qty']);
+                // For salesman sales the warehouse was already decremented at allocation time.
+                // Only decrement here for direct (admin) sales.
+                if (! $isSalesmanSale) {
+                    $this->stockService->removeFilledStock($item['cylinder_id'], $item['qty']);
+                }
+
                 $totalAmount  += $fifoResult['total_revenue'];
                 $allSaleItems  = array_merge($allSaleItems, $fifoResult['breakdown']);
             }
@@ -153,6 +159,9 @@ class SaleService
     public function deleteSale(Sale $sale): void
     {
         DB::transaction(function () use ($sale) {
+            $sale->loadMissing('salesman');
+            $isSalesmanSale = $sale->salesman?->role === 'salesman';
+
             foreach ($sale->items as $saleItem) {
                 $purchaseItem = PurchaseItem::find($saleItem->purchase_item_id);
                 if ($purchaseItem) {
@@ -165,7 +174,11 @@ class SaleService
                     ]);
                 }
 
-                $this->stockService->addFilledStock($saleItem->cylinder_id, $saleItem->qty);
+                // For salesman sales, stock returns via allocation sold_qty reversal below.
+                // Only restore warehouse stock for direct (admin) sales.
+                if (! $isSalesmanSale) {
+                    $this->stockService->addFilledStock($saleItem->cylinder_id, $saleItem->qty);
+                }
             }
 
             $qtyByCylinder = [];

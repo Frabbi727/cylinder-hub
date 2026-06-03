@@ -96,7 +96,7 @@ export default function SaleDetail() {
                 </td>
                 <td style={{ textAlign: 'center', fontWeight: 600 }}>{it.qty}</td>
                 <td style={{ textAlign: 'right', color: 'var(--text-2)' }}>{TK(it.unit_price)}</td>
-                <td style={{ textAlign: 'right', fontWeight: 700 }}>{TK(parseFloat(it.qty) * parseFloat(it.unit_price))}</td>
+                <td style={{ textAlign: 'right', fontWeight: 700 }}>{TK(it.line_total)}</td>
               </tr>
             ))}
           </tbody>
