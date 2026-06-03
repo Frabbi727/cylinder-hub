@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\CylinderStock;
+use App\Models\StockAllocation;
 use App\Models\Customer;
 use App\Models\Supplier;
 use App\Models\Expense;
@@ -15,14 +16,20 @@ class DashboardService
 {
     public function getSummary(string $from, string $to): array
     {
-        $sales = Sale::whereBetween('sale_date', [$from, $to])->get();
-        $items = SaleItem::whereHas('sale', fn ($q) => $q->whereBetween('sale_date', [$from, $to]))->get();
+        $sales          = Sale::whereBetween('sale_date', [$from, $to])->get();
+        $items          = SaleItem::whereHas('sale', fn ($q) => $q->whereBetween('sale_date', [$from, $to]))->get();
+        $warehouseStock = (int) CylinderStock::sum('filled_qty');
+        $withSalesmen   = (int) StockAllocation::where('is_reconciled', false)
+            ->get()
+            ->sum(fn ($a) => max(0, $a->qty - $a->sold_qty - $a->returned_qty));
 
         return [
-            'today_sales_amount' => (float) $sales->sum('total_amount'),
-            'today_profit'       => (float) $items->sum('profit'),
-            'total_filled_stock' => (int)   CylinderStock::sum('filled_qty'),
-            'customer_due'       => (float) Customer::sum('total_due'),
+            'today_sales_amount'  => (float) $sales->sum('total_amount'),
+            'today_profit'        => (float) $items->sum('profit'),
+            'warehouse_stock'     => $warehouseStock,
+            'total_with_salesman' => $withSalesmen,
+            'total_filled_stock'  => $warehouseStock + $withSalesmen,
+            'customer_due'        => (float) Customer::sum('total_due'),
             'supplier_due'       => (float) Supplier::sum('total_due'),
             'monthly_expenses'   => (float) Expense::thisMonth()->sum('amount'),
             'today_sales_count'  => $sales->count(),

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
@@ -61,16 +61,10 @@ export default function SalesmanDashboard() {
   const salesman   = myData?.data?.salesman;
   const todaySales = myData?.data?.today_sales || [];
   const allocations= salesman?.allocations || [];
+  const stats      = myData?.data?.stats ?? {};
 
   const totalDues   = (duesData?.data || []).reduce((s, x) => s + parseFloat(x.due_amount || 0), 0);
   const duesCount   = (duesData?.data || []).length;
-
-  const stats = useMemo(() => {
-    const totalAllocated  = allocations.reduce((s, a) => s + (a.qty || 0), 0);
-    const totalSold       = allocations.reduce((s, a) => s + (a.sold_qty || 0), 0);
-    const cashCollected   = todaySales.reduce((s, x) => s + parseFloat(x.paid_amount || 0), 0);
-    return { totalAllocated, totalSold, cashCollected };
-  }, [allocations, todaySales]);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
@@ -102,10 +96,10 @@ export default function SalesmanDashboard() {
 
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12, marginBottom: 24 }}>
-        <StatCard4 icon={Package}      label="Total Allocated" value={`${stats.totalAllocated} pcs`} sub="Cylinders with you"             tone="primary" />
-        <StatCard4 icon={ShoppingCart} label="Total Sold"      value={`${stats.totalSold} pcs`}      sub="Sold so far today"              tone="success" />
-        <StatCard4 icon={DollarSign}   label="Cash Collected"  value={TK(stats.cashCollected)}        sub="Today's payments received"      tone="warning" />
-        <StatCard4 icon={AlertCircle}  label="Outstanding Dues" value={TK(totalDues)}                sub={`${duesCount} sales due`}       tone="danger" />
+        <StatCard4 icon={Package}      label="Total Allocated"  value={`${stats.total_allocated ?? 0} pcs`} sub="Cylinders with you"        tone="primary" />
+        <StatCard4 icon={ShoppingCart} label="Total Sold"       value={`${stats.total_sold ?? 0} pcs`}      sub="Sold so far today"          tone="success" />
+        <StatCard4 icon={DollarSign}   label="Cash Collected"   value={TK(stats.cash_collected)}             sub="Today's payments received"  tone="warning" />
+        <StatCard4 icon={AlertCircle}  label="Outstanding Dues" value={TK(totalDues)}                        sub={`${duesCount} sales due`}   tone="danger" />
       </div>
 
       {/* Today's allocations */}
@@ -124,8 +118,8 @@ export default function SalesmanDashboard() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
             {allocations.map(a => {
-              const remaining = Math.max(0, a.qty - (a.sold_qty || 0) - (a.returned_qty || 0));
-              const soldPct   = a.qty > 0 ? Math.round((a.sold_qty || 0) / a.qty * 100) : 0;
+              const remaining = a.with_salesman ?? 0;
+              const soldPct   = a.sold_pct ?? 0;
               return (
                 <div key={a.id} style={{ background: 'var(--bg)', borderRadius: 10, padding: 14, border: a.is_reconciled ? '1px solid var(--success)' : '1px solid var(--border-soft)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>

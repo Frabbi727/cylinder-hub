@@ -14,6 +14,7 @@ class DatabaseSeeder extends Seeder
 //            SupplierSeeder::class,
 //            CustomerSeeder::class,
 //            SampleDataSeeder::class,
+
         ]);
     }
 }

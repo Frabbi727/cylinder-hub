@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class StockAllocation extends Model
 {
+    protected $appends = ['with_salesman', 'sold_pct'];
+
     protected $fillable = [
         'salesman_id', 'cylinder_id', 'allocation_date',
         'qty', 'sale_price', 'sold_qty', 'returned_qty', 'collected_amount',
@@ -47,6 +49,11 @@ class StockAllocation extends Model
 
     public function getWithSalesmanAttribute(): int
     {
-        return $this->qty - $this->sold_qty - $this->returned_qty;
+        return max(0, $this->qty - $this->sold_qty - $this->returned_qty);
+    }
+
+    public function getSoldPctAttribute(): int
+    {
+        return $this->qty > 0 ? (int) round($this->sold_qty / $this->qty * 100) : 0;
     }
 }

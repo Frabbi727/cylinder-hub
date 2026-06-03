@@ -48,11 +48,21 @@ class SalesmanController extends Controller
             })->with('cylinder')->orderBy('allocation_date', 'desc');
         }]);
 
-        $todaySales = $this->saleRepository->salesmanSales($user->id, today()->toDateString());
+        $todaySales  = $this->saleRepository->salesmanSales($user->id, today()->toDateString());
+        $allocations = $user->allocations;
+
+        $stats = [
+            'total_allocated'  => $allocations->sum('qty'),
+            'total_sold'       => $allocations->sum('sold_qty'),
+            'total_returned'   => $allocations->sum('returned_qty'),
+            'total_remaining'  => $allocations->sum('with_salesman'),
+            'cash_collected'   => (float) collect($todaySales)->sum('paid_amount'),
+        ];
 
         return $this->success([
             'salesman'    => $user,
             'today_sales' => $todaySales,
+            'stats'       => $stats,
         ]);
     }
 
