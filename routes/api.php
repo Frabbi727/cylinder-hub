@@ -77,6 +77,7 @@ Route::prefix('v1')->group(function () {
                 Route::get('reports/purchases',  [ReportController::class, 'purchases']);
 
                 // Cylinders write
+
                 Route::post('cylinders',              [CylinderController::class, 'store']);
                 Route::put('cylinders/{cylinder}',    [CylinderController::class, 'update']);
                 Route::delete('cylinders/{cylinder}', [CylinderController::class, 'destroy']);
