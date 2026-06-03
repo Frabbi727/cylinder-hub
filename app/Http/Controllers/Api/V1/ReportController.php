@@ -30,6 +30,13 @@ class ReportController extends Controller
         return $this->success($this->reports->purchases($from, $to));
     }
 
+    public function cylinderFlow(Request $request): JsonResponse
+    {
+        [$from, $to] = $this->resolvePeriod($request);
+        $salesmanId  = $request->get('salesman_id') ? (int) $request->get('salesman_id') : null;
+        return $this->success($this->reports->cylinderFlow($from, $to, $salesmanId));
+    }
+
     private function resolvePeriod(Request $request): array
     {
         $period = $request->get('period', 'month');

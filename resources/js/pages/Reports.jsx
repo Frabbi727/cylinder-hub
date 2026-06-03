@@ -6,9 +6,9 @@ import { saleService } from '../services/saleService';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import {
   BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer,
-  XAxis, YAxis, Tooltip, Legend,
+  XAxis, YAxis, Tooltip,
 } from 'recharts';
-import { TrendingUp, DollarSign, ShoppingCart, AlertCircle, Download } from 'lucide-react';
+import { TrendingUp, DollarSign, ShoppingCart, AlertCircle, Download, Package, RotateCcw } from 'lucide-react';
 
 const TK    = (n) => '৳' + Number(n || 0).toLocaleString('en-US');
 const PCT   = (n) => (n * 100).toFixed(1) + '%';
@@ -46,8 +46,16 @@ export default function Reports() {
     enabled:  !!from && !!to,
   });
 
-  const report = reportData?.data;
-  const sales  = salesData?.data || [];
+  const { data: flowData } = useQuery({
+    queryKey: ['my-cylinder-flow', user?.id, from, to],
+    queryFn:  () => salesmanService.getCylinderFlow(user.id, from, to),
+    enabled:  !!user?.id && !!from && !!to,
+  });
+
+  const report   = reportData?.data;
+  const sales    = salesData?.data   || [];
+  const flow     = flowData?.data;
+  const flowCyls = flow?.by_cylinder || [];
 
   // Payment type breakdown for pie chart
   const payBreakdown = sales.reduce((acc, s) => {
@@ -199,6 +207,56 @@ export default function Reports() {
           </div>
         </div>
       )}
+
+      {/* Cylinder Flow section */}
+      <div className="card" style={{ padding: 0, marginBottom: 20 }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-soft)' }}>
+          <div style={{ fontWeight: 700, fontSize: 15 }}>Cylinder Flow</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>Allocated → Sold → Returned (unsold) + Empties collected</div>
+        </div>
+
+        {/* Mini KPIs */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 0, borderBottom: '1px solid var(--border-soft)' }}>
+          {[
+            { label: 'Allocated',       value: flow?.summary?.total_allocated        ?? 0, color: '#0B6E75' },
+            { label: 'Sold',            value: flow?.summary?.total_sold             ?? 0, color: '#176B3A' },
+            { label: 'Returned Unsold', value: flow?.summary?.total_returned_unsold  ?? 0, color: '#A85200' },
+            { label: 'With You',        value: flow?.summary?.total_with_salesman    ?? 0, color: '#5B2D8E' },
+            { label: 'Empties Back',    value: flow?.summary?.total_empties_collected?? 0, color: '#1D6FD1' },
+          ].map(({ label, value, color }, i) => (
+            <div key={label} style={{ textAlign: 'center', padding: '14px 8px', borderRight: i < 4 ? '1px solid var(--border-soft)' : undefined }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color }}>{value}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>{label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Per cylinder */}
+        {flowCyls.length > 0 && (
+          <table className="tbl" style={{ width: '100%' }}>
+            <thead>
+              <tr>
+                <th>Cylinder</th>
+                <th style={{ textAlign: 'center' }}>Allocated</th>
+                <th style={{ textAlign: 'center' }}>Sold</th>
+                <th style={{ textAlign: 'center' }}>Returned Unsold</th>
+                <th style={{ textAlign: 'center' }}>Empties Collected</th>
+              </tr>
+            </thead>
+            <tbody>
+              {flowCyls.map(r => (
+                <tr key={r.cylinder_id}>
+                  <td style={{ fontWeight: 600 }}>{r.cylinder_name} <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>{r.cylinder_size}</span></td>
+                  <td style={{ textAlign: 'center', fontWeight: 700 }}>{r.allocated}</td>
+                  <td style={{ textAlign: 'center', fontWeight: 700, color: '#176B3A' }}>{r.sold}</td>
+                  <td style={{ textAlign: 'center', fontWeight: 700, color: '#A85200' }}>{r.returned_unsold}</td>
+                  <td style={{ textAlign: 'center', fontWeight: 700, color: '#1D6FD1' }}>{r.empties_collected}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
       {/* Sales table */}
       <div className="card" style={{ padding: 0 }}>

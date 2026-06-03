@@ -161,6 +161,16 @@ class SalesmanController extends Controller
         return $this->success($this->reports->salesmanReport($user->id, $from, $to));
     }
 
+    public function cylinderFlow(Request $request, User $user): JsonResponse
+    {
+        if (auth()->user()->isSalesman() && (int) $user->id !== (int) auth()->id()) {
+            abort(403, 'Access denied.');
+        }
+
+        [$from, $to] = $this->resolvePeriod($request);
+        return $this->success($this->reports->cylinderFlow($from, $to, $user->id));
+    }
+
     public function reportAll(Request $request): JsonResponse
     {
         [$from, $to] = $this->resolvePeriod($request);

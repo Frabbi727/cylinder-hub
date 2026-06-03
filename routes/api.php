@@ -60,6 +60,7 @@ Route::prefix('v1')->group(function () {
             // Salesman self-service (and admin)
             Route::get('salesmen/{user}',                     [SalesmanController::class, 'show']);
             Route::get('salesmen/{user}/report',              [SalesmanController::class, 'report']);
+            Route::get('salesmen/{user}/cylinder-flow',       [SalesmanController::class, 'cylinderFlow']);
             Route::post('allocations/{allocation}/reconcile', [SalesmanController::class, 'reconcile']);
 
             // Empty cylinder returns — all roles read own, all roles post
@@ -72,9 +73,10 @@ Route::prefix('v1')->group(function () {
                 Route::get('dashboard', [DashboardController::class, 'index']);
 
                 // Reports
-                Route::get('reports/pnl',       [ReportController::class, 'pnl']);
-                Route::get('reports/cashflow',   [ReportController::class, 'cashflow']);
-                Route::get('reports/purchases',  [ReportController::class, 'purchases']);
+                Route::get('reports/pnl',            [ReportController::class, 'pnl']);
+                Route::get('reports/cashflow',        [ReportController::class, 'cashflow']);
+                Route::get('reports/purchases',       [ReportController::class, 'purchases']);
+                Route::get('reports/cylinder-flow',   [ReportController::class, 'cylinderFlow']);
 
                 // Cylinders write
 

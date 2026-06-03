@@ -7,6 +7,7 @@ import AppShell from '../components/layout/AppShell';
 // Admin pages
 import Dashboard     from '../pages/Dashboard';
 import ExtraReturns  from '../pages/admin/ExtraReturns';
+import CylinderFlow  from '../pages/admin/CylinderFlow';
 import Inventory    from '../pages/Inventory';
 import Purchases    from '../pages/Purchases';
 import Sales        from '../pages/Sales';
@@ -73,6 +74,7 @@ export default function Router() {
                 <Route path="suppliers"      element={<AdminRoute><Suppliers /></AdminRoute>} />
                 <Route path="expenses"       element={<AdminRoute><Expenses /></AdminRoute>} />
                 <Route path="extra-returns"  element={<AdminRoute><ExtraReturns /></AdminRoute>} />
+                <Route path="cylinder-flow"  element={<AdminRoute><CylinderFlow /></AdminRoute>} />
 
                 {/* ── Shared (admin + salesman) ── */}
                 <Route path="sales"     element={<Sales />} />

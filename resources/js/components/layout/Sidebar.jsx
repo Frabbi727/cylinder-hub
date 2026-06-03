@@ -9,7 +9,7 @@ import {
   Gauge, Package, Layers, Truck, ShoppingCart,
   Users, Building2, Receipt, Flame, LogOut, PlusCircle,
   LayoutDashboard, AlertCircle, PackageOpen, Moon, BarChart2,
-  RotateCcw,
+  RotateCcw, GitCompareArrows,
 } from 'lucide-react';
 
 export default function Sidebar() {
@@ -52,7 +52,10 @@ export default function Sidebar() {
       { path: '/suppliers',  label: t('nav.suppliers'),  icon: Building2 },
     ]},
     { group: t('nav.finance'), items: [
-      { path: '/expenses',   label: t('nav.expenses'),   icon: Receipt },
+      { path: '/expenses',       label: t('nav.expenses'),    icon: Receipt },
+    ]},
+    { group: 'Reports', items: [
+      { path: '/cylinder-flow',  label: 'Cylinder Flow',      icon: GitCompareArrows },
     ]},
   ];
 

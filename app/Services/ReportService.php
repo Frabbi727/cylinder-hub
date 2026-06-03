@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\CylinderReturn;
 use App\Models\DueCollection;
 use App\Models\DuePayment;
 use App\Models\Expense;
@@ -149,6 +150,98 @@ class ReportService
                 'total_paid' => round((float) ($totals->total_paid ?? 0), 2),
                 'total_owe'  => round((float) ($totals->total_owe ?? 0), 2),
             ],
+        ];
+    }
+
+    public function cylinderFlow(string $from, string $to, ?int $salesmanId = null): array
+    {
+        // ── Allocation stream (filled cylinders going out and coming back) ──────
+        $allocQuery = StockAllocation::with(['salesman', 'cylinder'])
+            ->whereBetween('allocation_date', [$from, $to]);
+        if ($salesmanId) {
+            $allocQuery->where('salesman_id', $salesmanId);
+        }
+
+        $allocations = $allocQuery->get();
+
+        // ── Empty collection stream ───────────────────────────────────────────
+        $returnsQuery = CylinderReturn::with(['cylinder', 'salesman'])
+            ->whereBetween('return_date', [$from, $to])
+            ->where('type', 'empty_return')
+            ->where(fn ($q) => $q->whereNull('is_verified')->orWhere('is_verified', true));
+        if ($salesmanId) {
+            $returnsQuery->where('salesman_id', $salesmanId);
+        }
+
+        $returns = $returnsQuery->get();
+
+        // ── Grand totals ──────────────────────────────────────────────────────
+        $summary = [
+            'total_allocated'       => (int) $allocations->sum('qty'),
+            'total_sold'            => (int) $allocations->sum('sold_qty'),
+            'total_returned_unsold' => (int) $allocations->sum('returned_qty'),
+            'total_with_salesman'   => (int) $allocations->sum(fn ($a) => max(0, $a->qty - $a->sold_qty - $a->returned_qty)),
+            'total_empties_collected'=> (int) $returns->sum('qty'),
+            'total_empties_extra'   => (int) $returns->where('is_extra', true)->sum('qty'),
+            'total_empties_normal'  => (int) $returns->where('is_extra', false)->sum('qty'),
+        ];
+
+        // ── Per-salesman breakdown ────────────────────────────────────────────
+        $salesmenIds = User::where('role', 'salesman')
+            ->when($salesmanId, fn ($q) => $q->where('id', $salesmanId))
+            ->pluck('name', 'id');
+
+        $bySalesman = $salesmenIds->map(function ($name, $id) use ($allocations, $returns) {
+            $myAllocs   = $allocations->where('salesman_id', $id);
+            $myReturns  = $returns->where('salesman_id', $id);
+            $allocated  = (int) $myAllocs->sum('qty');
+            $sold       = (int) $myAllocs->sum('sold_qty');
+            $retUnsold  = (int) $myAllocs->sum('returned_qty');
+            $withMe     = max(0, $allocated - $sold - $retUnsold);
+            $empties    = (int) $myReturns->sum('qty');
+
+            return [
+                'salesman_id'           => $id,
+                'salesman_name'         => $name,
+                'allocated'             => $allocated,
+                'sold'                  => $sold,
+                'returned_unsold'       => $retUnsold,
+                'with_salesman'         => $withMe,
+                'empties_collected'     => $empties,
+                'sell_through_rate'     => $allocated > 0 ? round($sold / $allocated * 100, 1) : 0,
+            ];
+        })->values()->all();
+
+        // ── Per-cylinder breakdown ────────────────────────────────────────────
+        $cylinderIds = $allocations->pluck('cylinder_id')->merge($returns->pluck('cylinder_id'))->unique();
+
+        $byCylinder = $cylinderIds->map(function ($cylId) use ($allocations, $returns) {
+            $myAllocs   = $allocations->where('cylinder_id', $cylId);
+            $myReturns  = $returns->where('cylinder_id', $cylId);
+            $cylinder   = $myAllocs->first()?->cylinder ?? $myReturns->first()?->cylinder;
+            $allocated  = (int) $myAllocs->sum('qty');
+            $sold       = (int) $myAllocs->sum('sold_qty');
+            $retUnsold  = (int) $myAllocs->sum('returned_qty');
+            $withSalesmen = max(0, $allocated - $sold - $retUnsold);
+            $empties    = (int) $myReturns->sum('qty');
+
+            return [
+                'cylinder_id'       => $cylId,
+                'cylinder_name'     => $cylinder?->name,
+                'cylinder_size'     => $cylinder?->size,
+                'allocated'         => $allocated,
+                'sold'              => $sold,
+                'returned_unsold'   => $retUnsold,
+                'with_salesmen'     => $withSalesmen,
+                'empties_collected' => $empties,
+            ];
+        })->sortByDesc('allocated')->values()->all();
+
+        return [
+            'period'      => ['from' => $from, 'to' => $to],
+            'summary'     => $summary,
+            'by_salesman' => $bySalesman,
+            'by_cylinder' => $byCylinder,
         ];
     }
 
