@@ -62,7 +62,7 @@ export default function NewSale() {
 
   /* ── Allocation map ─────────────────────────────────────────────── */
   const allocMap = useMemo(() => {
-    const allocs = myData?.salesman?.allocations || [];
+    const allocs = myData?.data?.salesman?.allocations || [];
     return allocs.reduce((acc, a) => {
       if (a.is_reconciled) return acc;
       const remaining = Math.max(0, (a.qty || 0) - (a.sold_qty || 0) - (a.returned_qty || 0));

@@ -126,7 +126,7 @@ export default function Sales() {
   });
 
   const allAllocations = useMemo(() =>
-    isSalesman ? (myData?.salesman?.allocations || []) : [],
+    isSalesman ? (myData?.data?.salesman?.allocations || []) : [],
   [isSalesman, myData]);
 
   const activeAllocations    = allAllocations.filter(a => !a.is_reconciled);
