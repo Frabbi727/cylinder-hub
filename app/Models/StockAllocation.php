@@ -16,6 +16,9 @@ class StockAllocation extends Model
     {
         return [
             'allocation_date'  => 'date:Y-m-d',
+            'qty'              => 'integer',
+            'sold_qty'         => 'integer',
+            'returned_qty'     => 'integer',
             'sale_price'       => 'decimal:2',
             'collected_amount' => 'decimal:2',
             'is_reconciled'    => 'boolean',

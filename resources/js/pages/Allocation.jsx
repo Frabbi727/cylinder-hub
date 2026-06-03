@@ -45,7 +45,7 @@ export default function Allocation() {
   } = useAllocation();
 
   const activeSalesmen  = salesmen.filter(s => s.is_active).length;
-  const totalAllocated  = salesmen.reduce((s, sm) => s + (sm.allocations?.reduce((a, al) => a + al.qty, 0) || 0), 0);
+  const totalAllocated  = salesmen.reduce((s, sm) => s + (sm.allocations?.reduce((a, al) => a + (parseInt(al.qty) || 0), 0) || 0), 0);
   const totalCollected  = salesmen.reduce((s, sm) => s + (sm.allocations?.reduce((a, al) => a + parseFloat(al.collected_amount || 0), 0) || 0), 0);
 
   if (isLoading) return <LoadingSpinner text={t('common.loading')} />;
@@ -107,9 +107,9 @@ export default function Allocation() {
         )}
         {salesmen.map(sm => {
           const allocs         = sm.allocations || [];
-          const totalAllocQty  = allocs.reduce((s, a) => s + a.qty, 0);
-          const totalSoldQty   = allocs.reduce((s, a) => s + (a.sold_qty||0), 0);
-          const totalRetQty    = allocs.reduce((s, a) => s + (a.returned_qty||0), 0);
+          const totalAllocQty  = allocs.reduce((s, a) => s + (parseInt(a.qty)          || 0), 0);
+          const totalSoldQty   = allocs.reduce((s, a) => s + (parseInt(a.sold_qty)     || 0), 0);
+          const totalRetQty    = allocs.reduce((s, a) => s + (parseInt(a.returned_qty) || 0), 0);
           const withSalesman   = Math.max(0, totalAllocQty - totalSoldQty - totalRetQty);
           const collectedAmt   = allocs.reduce((s, a) => s + parseFloat(a.collected_amount||0), 0);
 
