@@ -59,9 +59,12 @@ class SalesmanController extends Controller
             'total_collected' => (float) $salesmenData->sum(fn ($s) => $s['alloc_stats']['collected_amount'] ?? 0),
         ];
 
-        return $this->success([
-            'salesmen' => $salesmenData,
-            'summary'  => $summary,
+        // Return salesmen as the top-level data array, summary alongside it
+        return response()->json([
+            'success' => true,
+            'message' => 'OK',
+            'data'    => $salesmenData->values()->all(),
+            'summary' => $summary,
         ]);
     }
 

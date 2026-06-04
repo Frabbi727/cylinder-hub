@@ -122,9 +122,9 @@ export function useAllocation() {
     setShowReconcile(true);
   };
 
-  // Handle both new {salesmen, summary} shape and any cached old array shape
-  const salesmenList    = Array.isArray(salesmenData) ? salesmenData : (salesmenData?.salesmen || []);
-  const allocSummary    = Array.isArray(salesmenData) ? {} : (salesmenData?.summary || {});
+  // salesmenData = full response: { success, data: [...salesmen], summary: {...}, message }
+  const salesmenList = salesmenData?.data    || [];
+  const allocSummary = salesmenData?.summary || {};
 
   return {
     salesmen:          salesmenList,
