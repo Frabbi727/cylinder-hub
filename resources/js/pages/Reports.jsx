@@ -188,6 +188,7 @@ export default function Reports() {
               { label: 'Sell-through', value: PCT(report.sell_through_rate || 0) },
               { label: 'Dues Created', value: TK(report.total_dues_created) },
               { label: 'Dues Collected', value: TK(report.total_dues_collected) },
+              { label: 'Collection Rate', value: `${(report.collection_rate_pct ?? 100).toFixed(1)}%` },
             ].map(({ label, value }) => (
               <div key={label} style={{ padding: '10px 0', borderBottom: '1px solid var(--border-soft)' }}>
                 <div style={{ fontSize: 16, fontWeight: 700 }}>{value}</div>
@@ -231,6 +232,7 @@ export default function Reports() {
                 <th style={{ textAlign: 'center' }}>Sold</th>
                 <th style={{ textAlign: 'center' }}>Returned Unsold</th>
                 <th style={{ textAlign: 'center' }}>Empties Collected</th>
+                <th style={{ textAlign: 'center' }}>Sell-through</th>
               </tr>
             </thead>
             <tbody>
@@ -241,6 +243,9 @@ export default function Reports() {
                   <td style={{ textAlign: 'center', fontWeight: 700, color: '#176B3A' }}>{r.sold}</td>
                   <td style={{ textAlign: 'center', fontWeight: 700, color: '#A85200' }}>{r.returned_unsold}</td>
                   <td style={{ textAlign: 'center', fontWeight: 700, color: '#1D6FD1' }}>{r.empties_collected}</td>
+                  <td style={{ textAlign: 'center', fontWeight: 700, color: r.sell_through_pct >= 80 ? '#176B3A' : r.sell_through_pct >= 50 ? '#A85200' : '#B83030' }}>
+                    {(r.sell_through_pct ?? 0).toFixed(1)}%
+                  </td>
                 </tr>
               ))}
             </tbody>

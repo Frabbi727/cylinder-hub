@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\CylinderStock;
+use App\Models\PurchaseItem;
 use App\Models\StockAllocation;
 use App\Models\Customer;
 use App\Models\Supplier;
@@ -23,16 +24,24 @@ class DashboardService
             ->get()
             ->sum(fn ($a) => max(0, $a->qty - $a->sold_qty - $a->returned_qty));
 
+        $customerDue    = (float) Customer::sum('total_due');
+        $supplierDue    = (float) Supplier::sum('total_due');
+        $inventoryValue = (float) PurchaseItem::whereIn('status', ['pending', 'active'])
+            ->selectRaw('SUM(remaining_qty * unit_cost) as value')
+            ->value('value');
+
         return [
             'today_sales_amount'  => (float) $sales->sum('total_amount'),
             'today_profit'        => (float) $items->sum('profit'),
             'warehouse_stock'     => $warehouseStock,
             'total_with_salesman' => $withSalesmen,
             'total_filled_stock'  => $warehouseStock + $withSalesmen,
-            'customer_due'        => (float) Customer::sum('total_due'),
-            'supplier_due'       => (float) Supplier::sum('total_due'),
-            'monthly_expenses'   => (float) Expense::thisMonth()->sum('amount'),
-            'today_sales_count'  => $sales->count(),
+            'customer_due'        => $customerDue,
+            'supplier_due'        => $supplierDue,
+            'monthly_expenses'    => (float) Expense::thisMonth()->sum('amount'),
+            'today_sales_count'   => $sales->count(),
+            'inventory_value'     => round($inventoryValue, 2),
+            'net_position'        => round($customerDue + $inventoryValue - $supplierDue, 2),
         ];
     }
 

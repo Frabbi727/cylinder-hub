@@ -41,14 +41,21 @@ class ReportService
         $totalExpenses = array_sum(array_column($expensesBreakdown, 'amount'));
         $netProfit     = $grossProfit - $totalExpenses;
 
+        $inventoryValue = (float) PurchaseItem::whereIn('status', ['pending', 'active'])
+            ->selectRaw('SUM(remaining_qty * unit_cost) as value')
+            ->value('value');
+
         return [
             'period'              => ['from' => $from, 'to' => $to],
             'total_revenue'       => round($totalRevenue, 2),
             'total_cogs'          => round($totalCogs, 2),
             'gross_profit'        => round($grossProfit, 2),
+            'gross_margin_pct'    => $totalRevenue > 0 ? round($grossProfit / $totalRevenue * 100, 2) : 0,
             'expenses_breakdown'  => $expensesBreakdown,
             'total_expenses'      => round($totalExpenses, 2),
             'net_profit'          => round($netProfit, 2),
+            'net_margin_pct'      => $totalRevenue > 0 ? round($netProfit / $totalRevenue * 100, 2) : 0,
+            'inventory_value'     => round($inventoryValue, 2),
         ];
     }
 
@@ -234,6 +241,7 @@ class ReportService
                 'returned_unsold'   => $retUnsold,
                 'with_salesmen'     => $withSalesmen,
                 'empties_collected' => $empties,
+                'sell_through_pct'  => $allocated > 0 ? round($sold / $allocated * 100, 1) : 0,
             ];
         })->sortByDesc('allocated')->values()->all();
 
@@ -330,6 +338,9 @@ class ReportService
             'total_dues_created'   => $totalDuesCreated,
             'total_dues_collected' => round($totalDuesCollected, 2),
             'still_outstanding'    => $stillOutstanding,
+            'collection_rate_pct'  => $totalDuesCreated > 0
+                ? round($totalDuesCollected / $totalDuesCreated * 100, 2)
+                : 100.0,
             'customers_reached'    => $customersReached,
             'sell_through_rate'    => $sellThroughRate,
             'pay_breakdown'        => $sales->groupBy('payment_type')
