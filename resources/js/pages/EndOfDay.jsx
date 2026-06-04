@@ -140,7 +140,7 @@ function ReconcileForm({ alloc, onSuccess, onCancel, totalOutstandingDues = 0, p
           {totalOutstandingDues > 0 && (
             <div style={{ background: '#FEF2F2', border: '1px solid #B83030', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 12, color: '#B83030', display: 'flex', gap: 6 }}>
               <AlertCircle size={14} style={{ marginTop: 1, flexShrink: 0 }} />
-              <span>After submission, <strong>{TK(totalOutstandingDues)}</strong> will still be outstanding. Collect when customers are available.</span>
+              <span>Your total outstanding from your own customers: <strong>{TK(totalOutstandingDues)}</strong>. Collect over time — this is only your sales.</span>
             </div>
           )}
           <div style={{ background: 'var(--surface)', borderRadius: 8, padding: '8px 14px', marginBottom: 16, fontSize: 12, color: 'var(--text-3)' }}>
@@ -285,7 +285,7 @@ export default function EndOfDay() {
             {stats.totalOutstandingDues > 0 && (
               <div style={{ marginTop: 10, padding: '8px 12px', background: '#FEF2F2', borderRadius: 8, display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                 <span style={{ color: '#B83030', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <AlertCircle size={13} /> Still outstanding
+                  <AlertCircle size={13} /> Your outstanding (your customers only)
                 </span>
                 <strong style={{ color: '#B83030' }}>{TK(stats.totalOutstandingDues)}</strong>
               </div>
@@ -351,7 +351,7 @@ export default function EndOfDay() {
           {stats.totalOutstandingDues > 0 && (
             <div style={{ marginTop: 10, padding: '8px 12px', background: '#FEF2F2', borderRadius: 8, display: 'flex', justifyContent: 'space-between', fontSize: 13, alignItems: 'center' }}>
               <span style={{ color: '#B83030', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <AlertCircle size={13} /> Still outstanding (to collect in future)
+                <AlertCircle size={13} /> Your outstanding (your customers only)
               </span>
               <strong style={{ color: '#B83030' }}>{TK(stats.totalOutstandingDues)}</strong>
             </div>

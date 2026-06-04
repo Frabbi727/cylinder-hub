@@ -254,42 +254,55 @@ export default function SalesmanDetail() {
               <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>Allocations ({allocs.length})</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {allocs.map(a => (
-                  <div key={a.id} className="card" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', borderLeft: a.is_reconciled ? '4px solid var(--success)' : '4px solid var(--warning)' }}>
-                    {a.cylinder && <CylBadge cylinder={a.cylinder} size="sm" />}
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600 }}>{a.cylinder?.name} {a.cylinder?.size}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{a.allocation_date} · {TK(a.sale_price)}/pcs</div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 16, fontSize: 12, textAlign: 'center' }}>
-                      {[['Allocated', a.qty, 'var(--text-1)'], ['Sold', a.sold_qty||0, 'var(--success)'], ['Returned', a.returned_qty||0, 'var(--warning)']].map(([lbl, val, col]) => (
-                        <div key={lbl}><div style={{ fontWeight: 700, color: col }}>{val}</div><div style={{ color: 'var(--text-3)' }}>{lbl}</div></div>
-                      ))}
-                    </div>
-                    {a.is_reconciled ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span className="pill pill-teal" style={{ fontSize: 11 }}>✓ Reconciled · {TK(a.collected_amount)}</span>
-                        <button className="btn btn-ghost btn-sm" style={{ padding: '3px 8px' }}
-                          title="Edit reconciliation"
-                          onClick={() => {
-                            setEditAllocTarget(a);
-                            setEditAllocForm({ sold_qty: String(a.sold_qty ?? 0), collected_amount: String(a.collected_amount ?? 0) });
-                            setEditAllocError('');
-                          }}>
-                          <Pencil size={12} />
-                        </button>
+                  <div key={a.id} className="card" style={{ padding: '12px 16px', borderLeft: a.is_reconciled ? '4px solid var(--success)' : '4px solid var(--warning)' }}>
+                    {/* Main row */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                      {a.cylinder && <CylBadge cylinder={a.cylinder} size="sm" />}
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600 }}>{a.cylinder?.name} {a.cylinder?.size}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{a.allocation_date} · {TK(a.sale_price)}/pcs</div>
                       </div>
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span className="pill pill-amber" style={{ fontSize: 11 }}>Pending EOD</span>
-                        <button className="btn btn-ghost btn-sm" style={{ padding: '3px 8px' }}
-                          title="Edit allocation"
-                          onClick={() => {
-                            setEditPreAllocTarget(a);
-                            setEditPreAllocForm({ qty: String(a.qty), sale_price: String(a.sale_price) });
-                            setEditPreAllocError('');
-                          }}>
-                          <Pencil size={12} />
-                        </button>
+                      <div style={{ display: 'flex', gap: 16, fontSize: 12, textAlign: 'center' }}>
+                        {[['Allocated', a.qty, 'var(--text-1)'], ['Sold', a.sold_qty||0, 'var(--success)'], ['Returned', a.returned_qty||0, 'var(--warning)']].map(([lbl, val, col]) => (
+                          <div key={lbl}><div style={{ fontWeight: 700, color: col }}>{val}</div><div style={{ color: 'var(--text-3)' }}>{lbl}</div></div>
+                        ))}
+                      </div>
+                      {a.is_reconciled ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span className="pill pill-teal" style={{ fontSize: 11 }}>✓ Reconciled · {TK(a.collected_amount)}</span>
+                          <button className="btn btn-ghost btn-sm" style={{ padding: '3px 8px' }}
+                            title="Edit reconciliation"
+                            onClick={() => {
+                              setEditAllocTarget(a);
+                              setEditAllocForm({ sold_qty: String(a.sold_qty ?? 0), collected_amount: String(a.collected_amount ?? 0) });
+                              setEditAllocError('');
+                            }}>
+                            <Pencil size={12} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span className="pill pill-amber" style={{ fontSize: 11 }}>Pending EOD</span>
+                          <button className="btn btn-ghost btn-sm" style={{ padding: '3px 8px' }}
+                            title="Edit allocation"
+                            onClick={() => {
+                              setEditPreAllocTarget(a);
+                              setEditPreAllocForm({ qty: String(a.qty), sale_price: String(a.sale_price) });
+                              setEditPreAllocError('');
+                            }}>
+                            <Pencil size={12} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {/* Customer dues row — server-computed, no frontend calculation */}
+                    {(a.customer_dues ?? []).length > 0 && (
+                      <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {a.customer_dues.map((d, i) => (
+                          <span key={i} style={{ background: '#FFF1DD', color: '#A85200', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                            {d.customer}: {TK(d.due_amount)} due
+                          </span>
+                        ))}
                       </div>
                     )}
                   </div>

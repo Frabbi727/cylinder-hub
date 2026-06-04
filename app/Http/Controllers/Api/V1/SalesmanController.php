@@ -119,26 +119,37 @@ class SalesmanController extends Controller
         // Each sale's paid_amount is distributed across its items by their share of
         // the sale total, so we know how much cash each cylinder type actually brought in.
         $cylinderCashMap = [];
+        $cylinderDuesMap = [];
         foreach ($todaySales as $sale) {
             $saleTotal  = (float) $sale->total_amount;
             $paidAmount = (float) $sale->paid_amount;
+            $saleDue    = max(0.0, $saleTotal - $paidAmount);
             if ($saleTotal <= 0) continue;
+            $customerName = $sale->customer?->name ?? 'Walk-in';
             foreach ($sale->items as $item) {
                 $lineTotal  = (float) $item->line_total;
                 $proportion = $lineTotal / $saleTotal;
                 $cid        = $item->cylinder_id;
                 $cylinderCashMap[$cid] = ($cylinderCashMap[$cid] ?? 0.0)
                     + round($paidAmount * $proportion, 2);
+                $itemDue = round($saleDue * $proportion, 2);
+                if ($itemDue > 0) {
+                    $cylinderDuesMap[$cid][] = [
+                        'customer'   => $customerName,
+                        'due_amount' => $itemDue,
+                    ];
+                }
             }
         }
 
-        // Attach cash_collected_actual and due_from_sales to every allocation so the
-        // EOD reconciliation form can pre-fill with the correct collected amount.
-        $allocations->each(function ($alloc) use ($cylinderCashMap) {
+        // Attach cash_collected_actual, due_from_sales, and customer_dues to every
+        // allocation — all computed server-side, no frontend arithmetic needed.
+        $allocations->each(function ($alloc) use ($cylinderCashMap, $cylinderDuesMap) {
             $expected = round((float) $alloc->sold_qty * (float) $alloc->sale_price, 2);
             $actual   = round($cylinderCashMap[$alloc->cylinder_id] ?? 0.0, 2);
             $alloc->cash_collected_actual = min($actual, $expected);
             $alloc->due_from_sales        = max(0.0, round($expected - $actual, 2));
+            $alloc->customer_dues         = $cylinderDuesMap[$alloc->cylinder_id] ?? [];
         });
 
         $stats = [

@@ -280,6 +280,39 @@ class ReportService
             ->orderByDesc('allocation_date')
             ->get();
 
+        // Build per-cylinder cash and dues maps from sales (all server-side).
+        $cylinderCashMapReport = [];
+        $cylinderDuesMapReport = [];
+        foreach ($sales as $sale) {
+            $saleTotal    = (float) $sale->total_amount;
+            $paidAmount   = (float) $sale->paid_amount;
+            $saleDue      = max(0.0, $saleTotal - $paidAmount);
+            if ($saleTotal <= 0) continue;
+            $customerName = $sale->customer?->name ?? 'Walk-in';
+            foreach ($sale->items as $item) {
+                $lineTotal  = (float) $item->line_total;
+                $proportion = $lineTotal / $saleTotal;
+                $cid        = $item->cylinder_id;
+                $cylinderCashMapReport[$cid] = ($cylinderCashMapReport[$cid] ?? 0.0)
+                    + round($paidAmount * $proportion, 2);
+                $itemDue = round($saleDue * $proportion, 2);
+                if ($itemDue > 0) {
+                    $cylinderDuesMapReport[$cid][] = [
+                        'customer'   => $customerName,
+                        'due_amount' => $itemDue,
+                    ];
+                }
+            }
+        }
+
+        $allocations->each(function ($alloc) use ($cylinderCashMapReport, $cylinderDuesMapReport) {
+            $expected = round((float) $alloc->sold_qty * (float) $alloc->sale_price, 2);
+            $actual   = round($cylinderCashMapReport[$alloc->cylinder_id] ?? 0.0, 2);
+            $alloc->cash_collected_actual = min($actual, $expected);
+            $alloc->due_from_sales        = max(0.0, round($expected - $actual, 2));
+            $alloc->customer_dues         = $cylinderDuesMapReport[$alloc->cylinder_id] ?? [];
+        });
+
         return [
             'salesman' => [
                 'id'             => $salesman->id,
