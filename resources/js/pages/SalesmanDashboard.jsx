@@ -9,7 +9,7 @@ import StatusPill from '../components/ui/StatusPill';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import {
   LayoutDashboard, TrendingUp, DollarSign, AlertCircle,
-  ShoppingCart, ChevronRight, Package, Moon,
+  ShoppingCart, ChevronRight, Package, Moon, Wallet,
 } from 'lucide-react';
 
 const TK = (n) => '৳' + Number(n || 0).toLocaleString('en-US');
@@ -95,11 +95,13 @@ export default function SalesmanDashboard() {
       </div>
 
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12, marginBottom: 24 }}>
         <StatCard4 icon={Package}      label="Total Allocated"  value={`${stats.total_allocated ?? 0} pcs`} sub="Cylinders with you"        tone="primary" />
         <StatCard4 icon={ShoppingCart} label="Total Sold"       value={`${stats.total_sold ?? 0} pcs`}      sub="Sold so far today"          tone="success" />
         <StatCard4 icon={DollarSign}   label="Cash Collected"   value={TK(stats.cash_collected)}             sub="Today's payments received"  tone="warning" />
         <StatCard4 icon={AlertCircle}  label="Outstanding Dues" value={TK(totalDues)}                        sub={`${duesCount} sales due`}   tone="danger" />
+        <StatCard4 icon={Wallet}       label="Cash in Hand"     value={TK(stats.total_cash_to_hand_in)}      sub="Sales + collected dues"     tone="success" />
+        <StatCard4 icon={TrendingUp}   label="Today's Profit"   value={TK(stats.today_profit)}               sub="FIFO basis"                 tone="primary" />
       </div>
 
       {/* Today's allocations */}

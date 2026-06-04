@@ -7,6 +7,7 @@ use App\Http\Requests\Api\StoreAllocationRequest;
 use App\Http\Requests\Api\StoreSalesmanRequest;
 use App\Models\DueCollection;
 use App\Models\Sale;
+use App\Models\SaleItem;
 use App\Models\StockAllocation;
 use App\Models\User;
 use App\Repositories\Contracts\SaleRepositoryInterface;
@@ -198,18 +199,24 @@ class SalesmanController extends Controller
                 $cylinderPool[$alloc->cylinder_id] = max(0.0, $pool - $drain);
             });
 
+        $todayProfit = (float) SaleItem::whereHas(
+            'sale',
+            fn ($q) => $q->where('salesman_id', $user->id)->whereDate('sale_date', today())
+        )->sum('profit');
+
         $stats = [
             'total_allocated'          => $allocations->sum('qty'),
             'total_sold'               => $allocations->sum('sold_qty'),
             'total_returned'           => $allocations->sum('returned_qty'),
             'total_remaining'          => $allocations->sum('with_salesman'),
-            'cash_collected'           => $salesCashToday,        // cylinder sales cash only
+            'cash_collected'           => $salesCashToday,
             'today_total_sales_amount' => $todayTotalSales,
-            'today_paid_total'         => $todaySalesPaidTotal,   // for summary row "Paid" column
-            'today_due_amount'         => $todayDueAmount,        // currently still outstanding
-            'pending_due_collections'  => $pendingDueCollections, // unsubmitted due collections
+            'today_paid_total'         => $todaySalesPaidTotal,
+            'today_due_amount'         => $todayDueAmount,
+            'pending_due_collections'  => $pendingDueCollections,
             'total_cash_to_hand_in'    => $salesCashToday + $pendingDueCollections,
             'total_outstanding_dues'   => $totalOutstandingDues,
+            'today_profit'             => round($todayProfit, 2),
         ];
 
         return $this->success([

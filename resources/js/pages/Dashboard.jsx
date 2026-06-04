@@ -1,13 +1,15 @@
 import React from 'react';
 import { useDashboard } from '../hooks/useDashboard';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
+import { reportService } from '../services/reportService';
 import StatCard    from '../components/ui/StatCard';
 import MiniBars    from '../components/ui/MiniBars';
 import StatusPill  from '../components/ui/StatusPill';
 import CylCell     from '../components/ui/CylCell';
 import StockBar    from '../components/ui/StockBar';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
-import { TrendingUp, Package, CreditCard, ShoppingCart, BarChart2 } from 'lucide-react';
+import { TrendingUp, Package, CreditCard, ShoppingCart, BarChart2, TrendingDown } from 'lucide-react';
 
 const TK = (n) => '৳' + Number(n || 0).toLocaleString('en-US');
 
@@ -22,6 +24,18 @@ export default function Dashboard() {
   const greeting = hour < 12 ? t('dashboard.greetingMorning')
     : hour < 17 ? t('dashboard.greetingAfternoon')
     : t('dashboard.greetingEvening');
+
+  const pnlParams = period === 'custom'
+    ? [undefined, customFrom, customTo]
+    : [period, undefined, undefined];
+
+  const { data: pnlData } = useQuery({
+    queryKey: ['dashboard-pnl', period, customFrom, customTo],
+    queryFn:  () => reportService.pnl(...pnlParams),
+    enabled:  period !== 'custom' || (!!customFrom && !!customTo),
+    refetchInterval: 60_000,
+  });
+  const pnl = pnlData?.data ?? {};
 
   const PERIODS = ['today', 'week', 'month', 'custom'];
   const PERIOD_BTN_LABELS = {
@@ -93,6 +107,40 @@ export default function Dashboard() {
           value={TK(summary.customer_due)}
           foot={t('dashboard.totalReceivable')}
         />
+      </div>
+
+      {/* Profit & Loss */}
+      <div className="card" style={{ padding: 20, marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div>
+            <div className="section-title" style={{ marginBottom: 2 }}>Profit & Loss</div>
+            <div className="dim tiny">{periodLabel} · FIFO basis</div>
+          </div>
+          {pnl.net_profit !== undefined && (
+            <div style={{
+              padding: '4px 14px', borderRadius: 20, fontWeight: 700, fontSize: 13,
+              background: pnl.net_profit >= 0 ? '#E6F8EC' : '#FEF2F2',
+              color:      pnl.net_profit >= 0 ? '#176B3A'  : '#B83030',
+            }}>
+              {pnl.net_profit >= 0 ? '▲ Profit' : '▼ Loss'}
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+          {[
+            { label: 'Revenue',       value: TK(pnl.total_revenue),  color: 'var(--primary)', sub: '100%' },
+            { label: 'Cost of Goods', value: TK(pnl.total_cogs),     color: '#A85200',        sub: pnl.total_revenue > 0 ? `${((pnl.total_cogs / pnl.total_revenue) * 100).toFixed(1)}%` : '—' },
+            { label: 'Gross Profit',  value: TK(pnl.gross_profit),   color: pnl.gross_profit  >= 0 ? '#176B3A' : '#B83030', sub: `${pnl.gross_margin_pct ?? 0}%` },
+            { label: 'Expenses',      value: TK(pnl.total_expenses), color: '#B83030',        sub: 'All categories' },
+            { label: 'Net Profit',    value: TK(pnl.net_profit),     color: pnl.net_profit    >= 0 ? '#176B3A' : '#B83030', sub: `${pnl.net_margin_pct ?? 0}%` },
+          ].map(({ label, value, color, sub }) => (
+            <div key={label} style={{ background: 'var(--bg)', borderRadius: 10, padding: '12px 14px' }}>
+              <div style={{ fontSize: 17, fontWeight: 800, color }}>{value ?? '—'}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', marginTop: 3 }}>{label}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>{sub}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Chart + Stock */}
@@ -201,6 +249,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
     </div>
   );
 }
