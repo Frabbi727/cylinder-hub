@@ -40,8 +40,16 @@ class SaleController extends Controller
     public function store(StoreSaleRequest $request): JsonResponse
     {
         $data                  = $request->validated();
-        $data['salesman_id']   = auth()->id();
-        $data['salesman_role'] = auth()->user()->role;
+        $user                  = auth()->user();
+        $data['salesman_id']   = $user->id;
+        $data['salesman_role'] = $user->role;
+
+        if ($user->isSalesman() && ! empty($data['customer_id'])) {
+            $customer = Customer::find($data['customer_id']);
+            if (! $customer || (int) $customer->added_by !== (int) $user->id) {
+                abort(403, 'You can only sell to your own customers.');
+            }
+        }
 
         $sale = $this->saleService->createSale($data);
         return $this->created(new SaleResource($sale), 'Sale recorded.');

@@ -19,11 +19,12 @@ class CustomerController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $user = auth()->user();
         if ($request->has('search')) {
-            return $this->success($this->customers->search($request->search));
+            return $this->success($this->customers->search($request->search, $user));
         }
 
-        return $this->paginated($this->customers->paginate());
+        return $this->paginated($this->customers->paginate(15, $user));
     }
 
     public function store(StoreCustomerRequest $request): JsonResponse
@@ -37,6 +38,11 @@ class CustomerController extends Controller
 
     public function show(Customer $customer): JsonResponse
     {
+        $user = auth()->user();
+        if ($user->isSalesman() && (int) $customer->added_by !== (int) $user->id) {
+            abort(403);
+        }
+
         $customer->load(['sales', 'dueCollections']);
         $customer->total_revenue = (float) $customer->sales->sum('total_amount');
         $customer->total_paid    = (float) $customer->sales->sum('paid_amount');
@@ -81,6 +87,7 @@ class CustomerController extends Controller
     {
         $days = max(0, (int) $request->get('days', 7));
         $sort = $request->get('sort', 'amount_desc');
+        $user = auth()->user();
 
         $query = DB::table('sales as s')
             ->join('customers as c', 'c.id', '=', 's.customer_id')
@@ -102,6 +109,7 @@ class CustomerController extends Controller
             ->whereNull('s.deleted_at')
             ->whereRaw('(s.total_amount - s.paid_amount) > 0')
             ->whereNotNull('s.customer_id')
+            ->when($user->isSalesman(), fn ($q) => $q->where('c.added_by', $user->id))
             ->groupBy('c.id', 'c.name', 'c.phone', 'c.total_due')
             ->havingRaw('DATEDIFF(CURDATE(), MIN(s.sale_date)) >= ?', [$days]);
 
@@ -128,6 +136,11 @@ class CustomerController extends Controller
 
     public function empties(Customer $customer): JsonResponse
     {
+        $user = auth()->user();
+        if ($user->isSalesman() && (int) $customer->added_by !== (int) $user->id) {
+            abort(403);
+        }
+
         // Total cylinders sold to this customer, grouped by cylinder type
         $sold = SaleItem::select('cylinder_id', DB::raw('SUM(qty) as sold_qty'))
             ->whereHas('sale', fn ($q) => $q->where('customer_id', $customer->id)->whereNull('deleted_at'))

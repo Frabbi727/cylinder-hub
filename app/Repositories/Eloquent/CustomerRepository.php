@@ -3,15 +3,20 @@
 namespace App\Repositories\Eloquent;
 
 use App\Models\Customer;
+use App\Models\User;
 use App\Repositories\Contracts\CustomerRepositoryInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class CustomerRepository implements CustomerRepositoryInterface
 {
-    public function paginate(int $perPage = 15): LengthAwarePaginator
+    public function paginate(int $perPage = 15, ?User $user = null): LengthAwarePaginator
     {
-        return Customer::orderBy('name')->paginate($perPage);
+        $query = Customer::orderBy('name');
+        if ($user?->isSalesman()) {
+            $query->where('added_by', $user->id);
+        }
+        return $query->paginate($perPage);
     }
 
     public function findById(int $id): ?Customer
@@ -35,13 +40,21 @@ class CustomerRepository implements CustomerRepositoryInterface
         $customer->delete();
     }
 
-    public function withDue(): Collection
+    public function withDue(?User $user = null): Collection
     {
-        return Customer::withDue()->orderByDesc('total_due')->get();
+        $query = Customer::withDue()->orderByDesc('total_due');
+        if ($user?->isSalesman()) {
+            $query->where('added_by', $user->id);
+        }
+        return $query->get();
     }
 
-    public function search(string $term): Collection
+    public function search(string $term, ?User $user = null): Collection
     {
-        return Customer::search($term)->limit(20)->get();
+        $query = Customer::search($term);
+        if ($user?->isSalesman()) {
+            $query->where('added_by', $user->id);
+        }
+        return $query->limit(20)->get();
     }
 }
