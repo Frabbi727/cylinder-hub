@@ -258,11 +258,14 @@ class ReportService
 
         $sales = Sale::where('salesman_id', $salesmanId)
             ->whereBetween('sale_date', [$from, $to])
+            ->with(['customer:id,name,phone', 'items.cylinder'])
+            ->orderByDesc('sale_date')
             ->get();
 
         $totalRevenue       = (float) $sales->sum('total_amount');
         $totalCashCollected = (float) $sales->sum('paid_amount');
         $totalDuesCreated   = round($totalRevenue - $totalCashCollected, 2);
+        $customersReached   = $sales->whereNotNull('customer_id')->unique('customer_id')->count();
 
         $totalDuesCollected = (float) DueCollection::where('collected_by', $salesmanId)
             ->whereBetween('collection_date', [$from, $to])->sum('amount');
@@ -271,11 +274,18 @@ class ReportService
             ? round($totalSold / $totalAllocated, 4)
             : 0.0;
 
+        $allocations = StockAllocation::where('salesman_id', $salesmanId)
+            ->whereBetween('allocation_date', [$from, $to])
+            ->with('cylinder')
+            ->orderByDesc('allocation_date')
+            ->get();
+
         return [
             'salesman' => [
                 'id'             => $salesman->id,
                 'name'           => $salesman->name,
                 'phone'          => $salesman->phone,
+                'is_active'      => $salesman->is_active,
                 'avatar_initials'=> $salesman->avatar_initials,
             ],
             'period'               => ['from' => $from, 'to' => $to],
@@ -287,6 +297,7 @@ class ReportService
             'total_dues_created'   => $totalDuesCreated,
             'total_dues_collected' => round($totalDuesCollected, 2),
             'still_outstanding'    => $stillOutstanding,
+            'customers_reached'    => $customersReached,
             'sell_through_rate'    => $sellThroughRate,
             'pay_breakdown'        => $sales->groupBy('payment_type')
                 ->map->count()
@@ -294,6 +305,8 @@ class ReportService
             'daily_revenue'        => $sales->groupBy('sale_date')
                 ->map(fn ($group) => round((float) $group->sum('total_amount'), 2))
                 ->toArray(),
+            'sales'                => $sales,
+            'allocations'          => $allocations,
         ];
     }
 }

@@ -22,6 +22,7 @@ import SalesmanDashboard from '../pages/SalesmanDashboard';
 import SaleDetail        from '../pages/SaleDetail';
 import Dues              from '../pages/Dues';
 import CustomerDetail    from '../pages/CustomerDetail';
+import SalesmanDetail    from '../pages/SalesmanDetail';
 import Empties           from '../pages/Empties';
 import EndOfDay          from '../pages/EndOfDay';
 import Reports           from '../pages/Reports';
@@ -82,6 +83,7 @@ export default function Router() {
                 <Route path="sales/:id" element={<SaleDetail />} />
                 <Route path="customers" element={<Customers />} />
                 <Route path="customers/:id" element={<CustomerDetail />} />
+                <Route path="salesmen/:id" element={<AdminRoute><SalesmanDetail /></AdminRoute>} />
 
                 {/* ── Salesman-only routes ── */}
                 <Route path="dashboard" element={<SalesmanRoute><SalesmanDashboard /></SalesmanRoute>} />
