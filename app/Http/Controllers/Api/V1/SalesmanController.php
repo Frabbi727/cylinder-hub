@@ -115,6 +115,32 @@ class SalesmanController extends Controller
             ->whereRaw('total_amount > paid_amount')
             ->sum(\DB::raw('total_amount - paid_amount'));
 
+        // Build per-cylinder cash breakdown from today's sales (proportional split).
+        // Each sale's paid_amount is distributed across its items by their share of
+        // the sale total, so we know how much cash each cylinder type actually brought in.
+        $cylinderCashMap = [];
+        foreach ($todaySales as $sale) {
+            $saleTotal  = (float) $sale->total_amount;
+            $paidAmount = (float) $sale->paid_amount;
+            if ($saleTotal <= 0) continue;
+            foreach ($sale->items as $item) {
+                $lineTotal  = (float) $item->line_total;
+                $proportion = $lineTotal / $saleTotal;
+                $cid        = $item->cylinder_id;
+                $cylinderCashMap[$cid] = ($cylinderCashMap[$cid] ?? 0.0)
+                    + round($paidAmount * $proportion, 2);
+            }
+        }
+
+        // Attach cash_collected_actual and due_from_sales to every allocation so the
+        // EOD reconciliation form can pre-fill with the correct collected amount.
+        $allocations->each(function ($alloc) use ($cylinderCashMap) {
+            $expected = round((float) $alloc->sold_qty * (float) $alloc->sale_price, 2);
+            $actual   = round($cylinderCashMap[$alloc->cylinder_id] ?? 0.0, 2);
+            $alloc->cash_collected_actual = min($actual, $expected);
+            $alloc->due_from_sales        = max(0.0, round($expected - $actual, 2));
+        });
+
         $stats = [
             'total_allocated'          => $allocations->sum('qty'),
             'total_sold'               => $allocations->sum('sold_qty'),

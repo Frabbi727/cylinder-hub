@@ -13,9 +13,11 @@ const today    = new Date().toLocaleDateString('en-US', { weekday: 'long', year:
 function ReconcileForm({ alloc, onSuccess, onCancel, totalOutstandingDues = 0, pendingDues = 0 }) {
   const qc = useQueryClient();
   const initSold = alloc.sold_qty ?? 0;
+  // Use server-computed actual cash (accounts for partial/due sales).
+  // Falls back to sold×price only when no sales data is available yet.
   const initCash = alloc.collected_amount > 0
     ? alloc.collected_amount
-    : initSold * parseFloat(alloc.sale_price || 0);
+    : parseFloat(alloc.cash_collected_actual ?? initSold * parseFloat(alloc.sale_price || 0));
   const [form, setForm] = useState({
     sold_qty:         String(initSold),
     collected_amount: String(initCash),
@@ -42,8 +44,14 @@ function ReconcileForm({ alloc, onSuccess, onCancel, totalOutstandingDues = 0, p
   const submittedCash = parseFloat(form.collected_amount) || 0;
 
   const handleSoldChange = (val) => {
-    const qty  = parseInt(val) || 0;
-    const cash = qty * parseFloat(alloc.sale_price || 0);
+    const qty = parseInt(val) || 0;
+    // Maintain the cash ratio from actual data: if server says collected 58k out of 78k
+    // (74.4%), use that ratio when qty changes rather than assuming 100% cash.
+    const fullExpected = (alloc.sold_qty || 0) * parseFloat(alloc.sale_price || 0);
+    const ratio = fullExpected > 0
+      ? parseFloat(alloc.cash_collected_actual ?? fullExpected) / fullExpected
+      : 1;
+    const cash = Math.round(qty * parseFloat(alloc.sale_price || 0) * ratio * 100) / 100;
     setForm(f => ({ ...f, sold_qty: val, collected_amount: String(cash) }));
   };
 
@@ -69,16 +77,26 @@ function ReconcileForm({ alloc, onSuccess, onCancel, totalOutstandingDues = 0, p
         </div>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontWeight: 800, fontSize: 22, color: 'var(--success)' }}>{alloc.sold_qty || 0}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Sales recorded</div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Sold</div>
         </div>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontWeight: 800, fontSize: 22, color: 'var(--primary)' }}>{TK(alloc.sale_price)}</div>
           <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Price/pcs</div>
         </div>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontWeight: 800, fontSize: 22, color: '#A85200' }}>{TK(expectedCash)}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Expected cash ({sold} × {TK(alloc.sale_price)})</div>
+          <div style={{ fontWeight: 800, fontSize: 22, color: 'var(--success)' }}>
+            {TK(alloc.cash_collected_actual ?? expectedCash)}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Customers paid</div>
         </div>
+        {(alloc.due_from_sales ?? 0) > 0 && (
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontWeight: 800, fontSize: 22, color: '#A85200' }}>
+              {TK(alloc.due_from_sales)}
+            </div>
+            <div style={{ fontSize: 11, color: '#A85200' }}>Due (credit given)</div>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -155,10 +173,15 @@ function ReconcileForm({ alloc, onSuccess, onCancel, totalOutstandingDues = 0, p
                 value={form.collected_amount}
                 onChange={e => setForm(f => ({ ...f, collected_amount: e.target.value }))}
                 required />
-              <div style={{ fontSize: 11, color: submittedCash === expectedCash ? 'var(--success)' : '#A85200', marginTop: 4, fontWeight: 500 }}>
-                {submittedCash === expectedCash
-                  ? `✓ Matches: ${sold} × ${TK(alloc.sale_price)}`
-                  : `Expected: ${TK(expectedCash)} — adjust if partial collected`}
+              <div style={{ fontSize: 11, marginTop: 4, fontWeight: 500, color: 'var(--text-3)' }}>
+                {(alloc.due_from_sales ?? 0) > 0
+                  ? <span style={{ color: '#A85200' }}>
+                      Collected: {TK(alloc.cash_collected_actual ?? expectedCash)} · Due: {TK(alloc.due_from_sales)}
+                    </span>
+                  : <span style={{ color: 'var(--success)' }}>
+                      ✓ Full cash: {sold} × {TK(alloc.sale_price)}
+                    </span>
+                }
               </div>
             </div>
           </div>
