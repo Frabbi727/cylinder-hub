@@ -70,7 +70,7 @@ export default function CylinderFlow() {
   const summary   = flow?.summary   || {};
   const bySalesman= flow?.by_salesman || [];
   const byCylinder= flow?.by_cylinder || [];
-  const salesmen  = Array.isArray(salesmenData) ? salesmenData : [];
+  const salesmen  = salesmenData?.data || [];
 
   const exportCSV = () => {
     const rows = [['Salesman', 'Allocated', 'Sold', 'Returned Unsold', 'With Salesman', 'Empties Collected', 'Sell-through %']];
