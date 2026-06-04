@@ -175,7 +175,7 @@ export default function Dashboard() {
             {[
               [t('dashboard.customerDue'), summary.customer_due, t('dashboard.toCollect'), 'var(--accent)'],
               [t('dashboard.supplierDue'), summary.supplier_due, t('dashboard.toPay'), 'var(--warning)'],
-              ['Inventory Value', summary.inventory_value, 'Stock at cost', 'var(--text-1)'],
+              [t('dashboard.inventoryValue'), summary.inventory_value, t('dashboard.stockAtCost'), 'var(--text-1)'],
               [t('dashboard.monthlyExpenses'), summary.monthly_expenses, t('dashboard.thisMonth'), 'var(--text-1)'],
             ].map(([label, val, sub, color]) => (
               <React.Fragment key={label}>
@@ -191,8 +191,8 @@ export default function Dashboard() {
             ))}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: 8, background: summary.net_position >= 0 ? '#176B3A18' : '#B8303018' }}>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)' }}>Net Position</div>
-                <div className="dim tiny">Receivables + Stock − Payables</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)' }}>{t('dashboard.netPosition')}</div>
+                <div className="dim tiny">{t('dashboard.netPositionHint')}</div>
               </div>
               <div style={{ fontSize: 18, fontWeight: 800, color: summary.net_position >= 0 ? '#176B3A' : '#B83030' }}>
                 {TK(summary.net_position)}

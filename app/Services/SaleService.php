@@ -86,7 +86,10 @@ class SaleService
                 ));
             }
 
-            $this->updateAllocationSoldQty($data['salesman_id'], $data['items'], $data['sale_date']);
+            $this->updateAllocationSoldQty(
+                $data['salesman_id'], $data['items'], $data['sale_date'],
+                $paidAmount, $totalAmount
+            );
 
             if ($sale->customer_id && $paidAmount < $totalAmount) {
                 Customer::where('id', $sale->customer_id)
@@ -125,12 +128,16 @@ class SaleService
         });
     }
 
-    private function updateAllocationSoldQty(int $salesmanId, array $items, string $saleDate): void
-    {
-        $qtyByCylinder = [];
+    private function updateAllocationSoldQty(
+        int $salesmanId, array $items, string $saleDate,
+        float $paidAmount = 0, float $totalAmount = 0
+    ): void {
+        $qtyByCylinder   = [];
+        $priceByCylinder = [];
         foreach ($items as $item) {
             $cid = (int) $item['cylinder_id'];
-            $qtyByCylinder[$cid] = ($qtyByCylinder[$cid] ?? 0) + (int) $item['qty'];
+            $qtyByCylinder[$cid]   = ($qtyByCylinder[$cid] ?? 0) + (int) $item['qty'];
+            $priceByCylinder[$cid] = (float) $item['unit_price'];
         }
 
         foreach ($qtyByCylinder as $cylinderId => $totalQty) {
@@ -150,6 +157,13 @@ class SaleService
                 $take     = min($remaining, $capacity);
                 if ($take > 0) {
                     $allocation->increment('sold_qty', $take);
+                    // Attribute proportional cash to this specific allocation
+                    if ($totalAmount > 0) {
+                        $lineRevenue  = $take * ($priceByCylinder[$cylinderId] ?? 0);
+                        $proportion   = $lineRevenue / $totalAmount;
+                        $cashForAlloc = round($paidAmount * $proportion, 2);
+                        $allocation->increment('collected_amount', $cashForAlloc);
+                    }
                     $remaining -= $take;
                 }
             }
@@ -181,10 +195,12 @@ class SaleService
                 }
             }
 
-            $qtyByCylinder = [];
+            $qtyByCylinder   = [];
+            $priceByCylinder = [];
             foreach ($sale->items as $saleItem) {
                 $cid = $saleItem->cylinder_id;
-                $qtyByCylinder[$cid] = ($qtyByCylinder[$cid] ?? 0) + $saleItem->qty;
+                $qtyByCylinder[$cid]   = ($qtyByCylinder[$cid] ?? 0) + $saleItem->qty;
+                $priceByCylinder[$cid] = (float) $saleItem->unit_price;
             }
             foreach ($qtyByCylinder as $cylinderId => $totalQty) {
                 // When reversing a sale, give back to the most recent allocation first
@@ -202,6 +218,16 @@ class SaleService
                     $take = min($remaining, $allocation->sold_qty);
                     if ($take > 0) {
                         $allocation->decrement('sold_qty', $take);
+                        // Reverse the proportional collected_amount for this allocation
+                        if ((float) $sale->total_amount > 0) {
+                            $lineRevenue   = $take * ($priceByCylinder[$cylinderId] ?? 0);
+                            $proportion    = $lineRevenue / (float) $sale->total_amount;
+                            $cashToReverse = round((float) $sale->paid_amount * $proportion, 2);
+                            $safeReverse   = max(0, min($cashToReverse, (float) $allocation->collected_amount));
+                            if ($safeReverse > 0) {
+                                $allocation->decrement('collected_amount', $safeReverse);
+                            }
+                        }
                         $remaining -= $take;
                     }
                 }

@@ -1,31 +1,27 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { reportService } from '../../services/reportService';
 import { salesmanService } from '../../services/salesmanService';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { Download, TrendingDown, TrendingUp, Package, RotateCcw } from 'lucide-react';
 
-const todayStr     = new Date().toISOString().split('T')[0];
-const weekStart    = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().split('T')[0]; })();
-const monthStart   = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+const todayStr   = new Date().toISOString().split('T')[0];
+const weekStart  = (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().split('T')[0]; })();
+const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
 
-const PERIODS = [
-  { key: 'today',  label: 'Today' },
-  { key: 'week',   label: 'This Week' },
-  { key: 'month',  label: 'This Month' },
-  { key: 'custom', label: 'Custom' },
-];
+const PERIOD_KEYS = ['today', 'week', 'month', 'custom'];
 
-function FlowBar({ sold, returnedUnsold, withSalesman, allocated }) {
+function FlowBar({ sold, returnedUnsold, withSalesman, allocated, tSold, tReturned, tWith }) {
   if (!allocated) return <div style={{ height: 8, background: 'var(--border-soft)', borderRadius: 4 }} />;
-  const soldPct   = Math.round(sold / allocated * 100);
-  const retPct    = Math.round(returnedUnsold / allocated * 100);
-  const withPct   = Math.round(withSalesman / allocated * 100);
+  const soldPct = Math.round(sold / allocated * 100);
+  const retPct  = Math.round(returnedUnsold / allocated * 100);
+  const withPct = Math.round(withSalesman / allocated * 100);
   return (
     <div style={{ height: 8, background: 'var(--border-soft)', borderRadius: 4, overflow: 'hidden', display: 'flex' }}>
-      <div title={`Sold: ${soldPct}%`}  style={{ width: `${soldPct}%`,  background: '#176B3A', height: '100%' }} />
-      <div title={`Returned: ${retPct}%`} style={{ width: `${retPct}%`, background: '#A85200', height: '100%' }} />
-      <div title={`With salesman: ${withPct}%`} style={{ width: `${withPct}%`, background: '#0B6E75', height: '100%' }} />
+      <div title={`${tSold}: ${soldPct}%`}    style={{ width: `${soldPct}%`,  background: '#176B3A', height: '100%' }} />
+      <div title={`${tReturned}: ${retPct}%`} style={{ width: `${retPct}%`,  background: '#A85200', height: '100%' }} />
+      <div title={`${tWith}: ${withPct}%`}    style={{ width: `${withPct}%`, background: '#0B6E75', height: '100%' }} />
     </div>
   );
 }
@@ -46,10 +42,18 @@ function SummaryCard({ label, value, sub, icon: Icon, color }) {
 }
 
 export default function CylinderFlow() {
+  const { t } = useTranslation();
   const [period, setPeriod]   = useState('today');
   const [from, setFrom]       = useState(todayStr);
   const [to, setTo]           = useState(todayStr);
   const [salesmanFilter, setSalesmanFilter] = useState('');
+
+  const PERIODS = [
+    { key: 'today',  label: t('common.today') },
+    { key: 'week',   label: t('common.thisWeek') },
+    { key: 'month',  label: t('common.thisMonth') },
+    { key: 'custom', label: t('common.custom') },
+  ];
 
   const { data: flowData, isLoading } = useQuery({
     queryKey: ['cylinder-flow', period, from, to, salesmanFilter],
@@ -66,11 +70,11 @@ export default function CylinderFlow() {
     queryFn:  () => salesmanService.getAll(),
   });
 
-  const flow      = flowData?.data;
-  const summary   = flow?.summary   || {};
-  const bySalesman= flow?.by_salesman || [];
-  const byCylinder= flow?.by_cylinder || [];
-  const salesmen  = salesmenData?.data || [];
+  const flow       = flowData?.data;
+  const summary    = flow?.summary    || {};
+  const bySalesman = flow?.by_salesman || [];
+  const byCylinder = flow?.by_cylinder || [];
+  const salesmen   = salesmenData?.data || [];
 
   const exportCSV = () => {
     const rows = [['Salesman', 'Allocated', 'Sold', 'Returned Unsold', 'With Salesman', 'Empties Collected', 'Sell-through %']];
@@ -83,20 +87,20 @@ export default function CylinderFlow() {
     a.download = `cylinder-flow-${todayStr}.csv`; a.click();
   };
 
-  if (isLoading) return <LoadingSpinner text="Loading cylinder flow..." />;
+  if (isLoading) return <LoadingSpinner text={t('cylinderFlow.loading')} />;
 
   return (
     <div>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Cylinder Flow</h2>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>{t('cylinderFlow.title')}</h2>
           <div style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 2 }}>
-            Allocated → Sold → Returned · Empty collections tracker
+            {t('cylinderFlow.subtitle')}
           </div>
         </div>
         <button className="btn btn-soft btn-sm" onClick={exportCSV}>
-          <Download size={13} /> Export CSV
+          <Download size={13} /> {t('cylinderFlow.exportCsv')}
         </button>
       </div>
 
@@ -115,25 +119,29 @@ export default function CylinderFlow() {
           </div>
         )}
         <select className="select" style={{ width: 'auto', minWidth: 160 }} value={salesmanFilter} onChange={e => setSalesmanFilter(e.target.value)}>
-          <option value="">All Salesmen</option>
+          <option value="">{t('cylinderFlow.allSalesmen')}</option>
           {salesmen.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
       </div>
 
       {/* Summary KPI cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 12, marginBottom: 24 }}>
-        <SummaryCard icon={Package}     label="Total Allocated"        value={summary.total_allocated ?? 0}        sub="Cylinders sent out"         color="#0B6E75" />
-        <SummaryCard icon={TrendingDown} label="Total Sold"            value={summary.total_sold ?? 0}             sub="Cylinders sold to customers" color="#176B3A" />
-        <SummaryCard icon={TrendingUp}   label="Returned Unsold"       value={summary.total_returned_unsold ?? 0}  sub="Back to filled stock"        color="#A85200" />
-        <SummaryCard icon={Package}      label="Still With Salesmen"   value={summary.total_with_salesman ?? 0}    sub="Not yet sold or returned"    color="#5B2D8E" />
-        <SummaryCard icon={RotateCcw}    label="Empties Collected"     value={summary.total_empties_collected ?? 0} sub={`${summary.total_empties_normal ?? 0} normal · ${summary.total_empties_extra ?? 0} extra`} color="#1D6FD1" />
+        <SummaryCard icon={Package}      label={t('cylinderFlow.totalAllocated')}   value={summary.total_allocated ?? 0}         sub={t('cylinderFlow.cylindersSentOut')}   color="#0B6E75" />
+        <SummaryCard icon={TrendingDown} label={t('cylinderFlow.totalSold')}        value={summary.total_sold ?? 0}              sub={t('cylinderFlow.soldToCustomers')}    color="#176B3A" />
+        <SummaryCard icon={TrendingUp}   label={t('cylinderFlow.returnedUnsold')}   value={summary.total_returned_unsold ?? 0}   sub={t('cylinderFlow.backToStock')}        color="#A85200" />
+        <SummaryCard icon={Package}      label={t('cylinderFlow.stillWithSalesmen')} value={summary.total_with_salesman ?? 0}   sub={t('cylinderFlow.notSoldOrReturned')}  color="#5B2D8E" />
+        <SummaryCard icon={RotateCcw}    label={t('cylinderFlow.emptiesCollected')} value={summary.total_empties_collected ?? 0} sub={t('cylinderFlow.normalExtra', { normal: summary.total_empties_normal ?? 0, extra: summary.total_empties_extra ?? 0 })} color="#1D6FD1" />
       </div>
 
       {/* Flow legend */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 16, fontSize: 12, flexWrap: 'wrap' }}>
-        {[['#176B3A','Sold'],['#A85200','Returned Unsold'],['#0B6E75','With Salesman']].map(([c,l]) => (
-          <span key={l} style={{ display:'flex', alignItems:'center', gap:5 }}>
-            <span style={{ width:10, height:10, borderRadius:2, background:c, flexShrink:0 }} />
+        {[
+          ['#176B3A', t('cylinderFlow.legendSold')],
+          ['#A85200', t('cylinderFlow.legendReturned')],
+          ['#0B6E75', t('cylinderFlow.legendWithSalesman')],
+        ].map(([c, l]) => (
+          <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 2, background: c, flexShrink: 0 }} />
             {l}
           </span>
         ))}
@@ -142,22 +150,22 @@ export default function CylinderFlow() {
       {/* Per-salesman table */}
       <div className="card" style={{ padding: 0, marginBottom: 20 }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-soft)', fontWeight: 700, fontSize: 15 }}>
-          By Salesman
+          {t('cylinderFlow.bySalesman')}
         </div>
         {bySalesman.length === 0 ? (
-          <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)' }}>No allocation data for this period.</div>
+          <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)' }}>{t('cylinderFlow.noSalesmanData')}</div>
         ) : (
           <table className="tbl" style={{ width: '100%' }}>
             <thead>
               <tr>
-                <th>Salesman</th>
-                <th style={{ textAlign: 'center' }}>Allocated</th>
-                <th style={{ textAlign: 'center' }}>Sold</th>
-                <th style={{ textAlign: 'center' }}>Returned (Unsold)</th>
-                <th style={{ textAlign: 'center' }}>With Salesman</th>
-                <th style={{ textAlign: 'center' }}>Empties Collected</th>
-                <th style={{ textAlign: 'center' }}>Sell-through</th>
-                <th style={{ minWidth: 120 }}>Flow</th>
+                <th>{t('cylinderFlow.colSalesman')}</th>
+                <th style={{ textAlign: 'center' }}>{t('cylinderFlow.colAllocated')}</th>
+                <th style={{ textAlign: 'center' }}>{t('cylinderFlow.colSold')}</th>
+                <th style={{ textAlign: 'center' }}>{t('cylinderFlow.colReturnedUnsold')}</th>
+                <th style={{ textAlign: 'center' }}>{t('cylinderFlow.colWithSalesman')}</th>
+                <th style={{ textAlign: 'center' }}>{t('cylinderFlow.colEmpties')}</th>
+                <th style={{ textAlign: 'center' }}>{t('cylinderFlow.colSellThrough')}</th>
+                <th style={{ minWidth: 120 }}>{t('cylinderFlow.colFlow')}</th>
               </tr>
             </thead>
             <tbody>
@@ -175,14 +183,20 @@ export default function CylinderFlow() {
                     </span>
                   </td>
                   <td style={{ minWidth: 120 }}>
-                    <FlowBar sold={r.sold} returnedUnsold={r.returned_unsold} withSalesman={r.with_salesman} allocated={r.allocated} />
+                    <FlowBar
+                      sold={r.sold} returnedUnsold={r.returned_unsold}
+                      withSalesman={r.with_salesman} allocated={r.allocated}
+                      tSold={t('cylinderFlow.legendSold')}
+                      tReturned={t('cylinderFlow.legendReturned')}
+                      tWith={t('cylinderFlow.legendWithSalesman')}
+                    />
                   </td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr style={{ background: 'var(--bg)', fontWeight: 700 }}>
-                <td style={{ padding: '10px 16px', fontSize: 13 }}>Total</td>
+                <td style={{ padding: '10px 16px', fontSize: 13 }}>{t('cylinderFlow.total')}</td>
                 <td style={{ textAlign: 'center', padding: '10px 16px' }}>{summary.total_allocated ?? 0}</td>
                 <td style={{ textAlign: 'center', padding: '10px 16px', color: '#176B3A' }}>{summary.total_sold ?? 0}</td>
                 <td style={{ textAlign: 'center', padding: '10px 16px', color: '#A85200' }}>{summary.total_returned_unsold ?? 0}</td>
@@ -198,21 +212,21 @@ export default function CylinderFlow() {
       {/* Per-cylinder table */}
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-soft)', fontWeight: 700, fontSize: 15 }}>
-          By Cylinder Type
+          {t('cylinderFlow.byCylinder')}
         </div>
         {byCylinder.length === 0 ? (
-          <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)' }}>No data for this period.</div>
+          <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)' }}>{t('cylinderFlow.noData')}</div>
         ) : (
           <table className="tbl" style={{ width: '100%' }}>
             <thead>
               <tr>
-                <th>Cylinder</th>
-                <th style={{ textAlign: 'center' }}>Allocated</th>
-                <th style={{ textAlign: 'center' }}>Sold</th>
-                <th style={{ textAlign: 'center' }}>Returned (Unsold)</th>
-                <th style={{ textAlign: 'center' }}>With Salesmen</th>
-                <th style={{ textAlign: 'center' }}>Empties Collected</th>
-                <th style={{ minWidth: 120 }}>Flow</th>
+                <th>{t('cylinderFlow.colCylinder')}</th>
+                <th style={{ textAlign: 'center' }}>{t('cylinderFlow.colAllocated')}</th>
+                <th style={{ textAlign: 'center' }}>{t('cylinderFlow.colSold')}</th>
+                <th style={{ textAlign: 'center' }}>{t('cylinderFlow.colReturnedUnsold')}</th>
+                <th style={{ textAlign: 'center' }}>{t('cylinderFlow.colWithSalesmen')}</th>
+                <th style={{ textAlign: 'center' }}>{t('cylinderFlow.colEmpties')}</th>
+                <th style={{ minWidth: 120 }}>{t('cylinderFlow.colFlow')}</th>
               </tr>
             </thead>
             <tbody>
@@ -225,7 +239,13 @@ export default function CylinderFlow() {
                   <td style={{ textAlign: 'center', fontWeight: 700, color: r.with_salesmen > 0 ? '#5B2D8E' : 'var(--text-3)' }}>{r.with_salesmen}</td>
                   <td style={{ textAlign: 'center', fontWeight: 700, color: '#1D6FD1' }}>{r.empties_collected}</td>
                   <td>
-                    <FlowBar sold={r.sold} returnedUnsold={r.returned_unsold} withSalesman={r.with_salesmen} allocated={r.allocated} />
+                    <FlowBar
+                      sold={r.sold} returnedUnsold={r.returned_unsold}
+                      withSalesman={r.with_salesmen} allocated={r.allocated}
+                      tSold={t('cylinderFlow.legendSold')}
+                      tReturned={t('cylinderFlow.legendReturned')}
+                      tWith={t('cylinderFlow.legendWithSalesman')}
+                    />
                   </td>
                 </tr>
               ))}

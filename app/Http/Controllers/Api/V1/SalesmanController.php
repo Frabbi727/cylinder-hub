@@ -144,13 +144,24 @@ class SalesmanController extends Controller
 
         // Attach cash_collected_actual, due_from_sales, and customer_dues to every
         // allocation — all computed server-side, no frontend arithmetic needed.
-        $allocations->each(function ($alloc) use ($cylinderCashMap, $cylinderDuesMap) {
-            $expected = round((float) $alloc->sold_qty * (float) $alloc->sale_price, 2);
-            $actual   = round($cylinderCashMap[$alloc->cylinder_id] ?? 0.0, 2);
-            $alloc->cash_collected_actual = min($actual, $expected);
-            $alloc->due_from_sales        = max(0.0, round($expected - $actual, 2));
-            $alloc->customer_dues         = $cylinderDuesMap[$alloc->cylinder_id] ?? [];
-        });
+        // Pool-based attribution: process allocations oldest-first so each claims
+        // its proportional share of the cylinder cash pool before newer ones take the rest.
+        // This correctly separates cash when two allocations share the same cylinder type,
+        // and works for both existing data (collected_amount=0) and new data.
+        $cylinderPool = $cylinderCashMap; // keyed by cylinder_id, seeded from today's paid_amounts
+
+        $allocations->sortBy(fn ($a) => $a->allocation_date . '_' . $a->created_at)
+            ->each(function ($alloc) use (&$cylinderPool, $cylinderDuesMap) {
+                $expected = round((float) $alloc->sold_qty * (float) $alloc->sale_price, 2);
+                $pool     = round($cylinderPool[$alloc->cylinder_id] ?? 0.0, 2);
+                $actual   = min($pool, $expected);
+
+                $alloc->cash_collected_actual = $actual;
+                $alloc->due_from_sales        = max(0.0, round($expected - $actual, 2));
+                $alloc->customer_dues         = $cylinderDuesMap[$alloc->cylinder_id] ?? [];
+
+                $cylinderPool[$alloc->cylinder_id] = max(0.0, $pool - $actual);
+            });
 
         $stats = [
             'total_allocated'          => $allocations->sum('qty'),
