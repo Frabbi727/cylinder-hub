@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\StoreAllocationRequest;
 use App\Http\Requests\Api\StoreSalesmanRequest;
+use App\Models\DueCollection;
 use App\Models\StockAllocation;
 use App\Models\User;
 use App\Repositories\Contracts\SaleRepositoryInterface;
@@ -82,15 +83,22 @@ class SalesmanController extends Controller
             })->with('cylinder')->orderBy('allocation_date', 'desc');
         }]);
 
-        $todaySales  = $this->saleRepository->salesmanSales($user->id, today()->toDateString());
-        $allocations = $user->allocations;
+        $todaySales          = $this->saleRepository->salesmanSales($user->id, today()->toDateString());
+        $allocations         = $user->allocations;
+        $dueCollectedToday   = (float) DueCollection::where('collected_by', $user->id)
+            ->whereDate('collection_date', today())
+            ->sum('amount');
+
+        $salesCashToday = (float) collect($todaySales)->sum('paid_amount');
 
         $stats = [
-            'total_allocated'  => $allocations->sum('qty'),
-            'total_sold'       => $allocations->sum('sold_qty'),
-            'total_returned'   => $allocations->sum('returned_qty'),
-            'total_remaining'  => $allocations->sum('with_salesman'),
-            'cash_collected'   => (float) collect($todaySales)->sum('paid_amount'),
+            'total_allocated'      => $allocations->sum('qty'),
+            'total_sold'           => $allocations->sum('sold_qty'),
+            'total_returned'       => $allocations->sum('returned_qty'),
+            'total_remaining'      => $allocations->sum('with_salesman'),
+            'cash_collected'       => $salesCashToday,
+            'due_collected_today'  => $dueCollectedToday,
+            'total_cash_to_hand_in'=> $salesCashToday + $dueCollectedToday,
         ];
 
         return $this->success([
@@ -140,6 +148,27 @@ class SalesmanController extends Controller
         );
 
         return $this->success($allocation, 'Allocation reconciled.');
+    }
+
+    public function dailyCollections(Request $request, User $user): JsonResponse
+    {
+        if (auth()->user()->isSalesman() && (int) $user->id !== (int) auth()->id()) {
+            abort(403, 'Access denied.');
+        }
+
+        $date = $request->get('date', today()->toDateString());
+
+        $collections = DueCollection::where('collected_by', $user->id)
+            ->whereDate('collection_date', $date)
+            ->with(['sale:id,sale_date,total_amount,paid_amount', 'customer:id,name,phone'])
+            ->orderByDesc('id')
+            ->get();
+
+        return $this->success([
+            'collections' => $collections,
+            'total'       => (float) $collections->sum('amount'),
+            'date'        => $date,
+        ]);
     }
 
     // ---- Salesman management (admin only) ----

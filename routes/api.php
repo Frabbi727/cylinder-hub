@@ -58,10 +58,11 @@ Route::prefix('v1')->group(function () {
             Route::get('customers/{customer}/empties', [CustomerController::class, 'empties']);
 
             // Salesman self-service (and admin)
-            Route::get('salesmen/{user}',                     [SalesmanController::class, 'show']);
-            Route::get('salesmen/{user}/report',              [SalesmanController::class, 'report']);
-            Route::get('salesmen/{user}/cylinder-flow',       [SalesmanController::class, 'cylinderFlow']);
-            Route::post('allocations/{allocation}/reconcile', [SalesmanController::class, 'reconcile']);
+            Route::get('salesmen/{user}',                          [SalesmanController::class, 'show']);
+            Route::get('salesmen/{user}/report',                   [SalesmanController::class, 'report']);
+            Route::get('salesmen/{user}/cylinder-flow',            [SalesmanController::class, 'cylinderFlow']);
+            Route::get('salesmen/{user}/daily-collections',        [SalesmanController::class, 'dailyCollections']);
+            Route::post('allocations/{allocation}/reconcile',      [SalesmanController::class, 'reconcile']);
 
             // Empty cylinder returns — all roles read own, all roles post
             Route::get('returns',  [StockController::class, 'returns']);

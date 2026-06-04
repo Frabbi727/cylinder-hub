@@ -133,12 +133,14 @@ export default function Sales() {
   const reconciledAllocations= allAllocations.filter(a =>  a.is_reconciled);
 
   // Summary stats — from backend (SalesmanController::show stats object)
-  const apiStats       = myData?.data?.stats ?? {};
-  const totalAllocated = apiStats.total_allocated ?? 0;
-  const totalSold      = apiStats.total_sold      ?? 0;
-  const totalReturned  = apiStats.total_returned  ?? 0;
-  const totalRemaining = apiStats.total_remaining ?? 0;
-  const totalCashCollected = todayCashCollected;
+  const apiStats           = myData?.data?.stats ?? {};
+  const totalAllocated     = apiStats.total_allocated      ?? 0;
+  const totalSold          = apiStats.total_sold           ?? 0;
+  const totalReturned      = apiStats.total_returned       ?? 0;
+  const totalRemaining     = apiStats.total_remaining      ?? 0;
+  const totalCashCollected = apiStats.cash_collected       ?? todayCashCollected;
+  const dueCollectedToday  = apiStats.due_collected_today  ?? 0;
+  const totalCashToHandIn  = apiStats.total_cash_to_hand_in ?? (totalCashCollected + dueCollectedToday);
 
   // All cylinders for empty return dropdown
   const { data: cylinders } = useQuery({
@@ -217,18 +219,32 @@ export default function Sales() {
   return (
     <div>
       {/* ── Stats bar ─────────────────────────────────────────────── */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:12, marginBottom:20 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:12, marginBottom:12 }}>
         {[
           { label: t('sales.totalPcs'),         val: `${totalAllocated} pcs`, color:'var(--text-1)' },
           { label: t('sales.soldPcs'),           val: `${totalSold} pcs`,     color:'var(--success)' },
           { label: t('sales.remainingPcs'),      val: `${totalRemaining} pcs`,color:'var(--primary)' },
-          { label: t('sales.cashCollectedToday'),val: TK(totalCashCollected), color:'var(--warning)' },
         ].map(({ label, val, color }) => (
           <div key={label} className="scard" style={{ textAlign:'center' }}>
             <div style={{ fontSize:18, fontWeight:700, color }}>{val}</div>
             <div className="dim tiny">{label}</div>
           </div>
         ))}
+      </div>
+      {/* Cash accountability bar */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:12, marginBottom:20 }}>
+        <div className="scard" style={{ textAlign:'center' }}>
+          <div style={{ fontSize:16, fontWeight:700, color:'var(--warning)' }}>{TK(totalCashCollected)}</div>
+          <div className="dim tiny">{t('sales.cashCollectedToday')}</div>
+        </div>
+        <div className="scard" style={{ textAlign:'center' }}>
+          <div style={{ fontSize:16, fontWeight:700, color: dueCollectedToday > 0 ? 'var(--success)' : 'var(--text-3)' }}>{TK(dueCollectedToday)}</div>
+          <div className="dim tiny">{t('sales.dueCollectedToday', 'Dues Collected')}</div>
+        </div>
+        <div className="scard" style={{ textAlign:'center', background:'var(--primary-soft)' }}>
+          <div style={{ fontSize:16, fontWeight:800, color:'var(--primary)' }}>{TK(totalCashToHandIn)}</div>
+          <div className="dim tiny">{t('sales.totalCashToHandIn', 'Total to Hand In')}</div>
+        </div>
       </div>
 
       {/* ── Today's load (allocation cards) ───────────────────────── */}

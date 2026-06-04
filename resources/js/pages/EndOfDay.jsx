@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { salesmanService } from '../services/salesmanService';
 import CylBadge from '../components/ui/CylBadge';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
-import { CheckCircle, AlertCircle, Moon } from 'lucide-react';
+import { CheckCircle, AlertCircle, Moon, Banknote, TrendingUp } from 'lucide-react';
 
 const TK      = (n) => '৳' + Number(n || 0).toLocaleString('en-US');
 const todayStr = new Date().toISOString().split('T')[0];
@@ -156,14 +156,26 @@ export default function EndOfDay() {
     enabled:  !!user?.id,
   });
 
-  const allocations    = myData?.data?.salesman?.allocations || [];
-  const allReconciled  = allocations.length > 0 && allocations.every(a => a.is_reconciled);
-  const apiStats       = myData?.data?.stats ?? {};
+  const { data: dueData } = useQuery({
+    queryKey: ['daily-collections', user?.id, todayStr],
+    queryFn:  () => salesmanService.getDailyCollections(user.id),
+    enabled:  !!user?.id,
+    refetchInterval: 30_000,
+  });
+
+  const allocations       = myData?.data?.salesman?.allocations || [];
+  const allReconciled     = allocations.length > 0 && allocations.every(a => a.is_reconciled);
+  const apiStats          = myData?.data?.stats ?? {};
+  const dueCollections    = dueData?.data?.collections || [];
+  const dueCollectedTotal = dueData?.data?.total ?? 0;
+
   const stats = {
-    totalSold:      apiStats.total_sold      ?? 0,
-    totalReturned:  apiStats.total_returned  ?? 0,
-    totalCash:      apiStats.cash_collected  ?? 0,
-    totalAllocated: apiStats.total_allocated ?? 0,
+    totalSold:         apiStats.total_sold       ?? 0,
+    totalReturned:     apiStats.total_returned   ?? 0,
+    totalCash:         apiStats.cash_collected   ?? 0,
+    totalAllocated:    apiStats.total_allocated  ?? 0,
+    dueCollected:      apiStats.due_collected_today ?? dueCollectedTotal,
+    totalCashToHandIn: apiStats.total_cash_to_hand_in ?? ((apiStats.cash_collected ?? 0) + dueCollectedTotal),
   };
 
   if (isLoading) return <LoadingSpinner text="Loading allocations..." />;
@@ -174,17 +186,35 @@ export default function EndOfDay() {
         <CheckCircle size={72} style={{ color: 'var(--success)', marginBottom: 20 }} />
         <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 8 }}>All Done!</div>
         <div style={{ color: 'var(--text-3)', marginBottom: 32, fontSize: 15 }}>All allocations reconciled for today.</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 16 }}>
           {[
-            { label: 'Total Sold', value: `${stats.totalSold} pcs` },
+            { label: 'Total Sold',     value: `${stats.totalSold} pcs` },
             { label: 'Total Returned', value: `${stats.totalReturned} pcs` },
-            { label: 'Cash Submitted', value: TK(stats.totalCash) },
           ].map(({ label, value }) => (
             <div key={label} className="card" style={{ padding: '14px 16px', textAlign: 'center' }}>
               <div style={{ fontSize: 18, fontWeight: 800 }}>{value}</div>
               <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>{label}</div>
             </div>
           ))}
+        </div>
+        <div className="card" style={{ padding: '16px 20px' }}>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12, fontWeight: 600 }}>Cash Summary</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+              <span>Cylinder sales collected</span>
+              <strong>{TK(stats.totalCash)}</strong>
+            </div>
+            {stats.dueCollected > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                <span>Previous dues collected</span>
+                <strong style={{ color: 'var(--success)' }}>{TK(stats.dueCollected)}</strong>
+              </div>
+            )}
+            <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800 }}>
+              <span>Total to hand in</span>
+              <span style={{ color: 'var(--primary)' }}>{TK(stats.totalCashToHandIn)}</span>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -212,6 +242,45 @@ export default function EndOfDay() {
           <span><strong>Overdue:</strong> You have unreconciled allocations from previous days. Please reconcile them below.</span>
         </div>
       )}
+
+      {/* Daily cash summary */}
+      <div className="card" style={{ padding: '14px 18px', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <TrendingUp size={15} style={{ color: 'var(--primary)' }} />
+          <span style={{ fontWeight: 700, fontSize: 14 }}>Today's Cash Accountability</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'var(--text-3)' }}>From today's cylinder sales</span>
+            <strong>{TK(stats.totalCash)}</strong>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'var(--text-3)' }}>From previous due collections today</span>
+            <strong style={{ color: stats.dueCollected > 0 ? 'var(--success)' : 'var(--text-3)' }}>
+              {TK(stats.dueCollected)}
+            </strong>
+          </div>
+          <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 6, display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: 15 }}>
+            <span>Total cash to hand in</span>
+            <span style={{ color: 'var(--primary)' }}>{TK(stats.totalCashToHandIn)}</span>
+          </div>
+        </div>
+        {dueCollections.length > 0 && (
+          <details style={{ marginTop: 12 }}>
+            <summary style={{ fontSize: 12, color: 'var(--text-3)', cursor: 'pointer' }}>
+              View {dueCollections.length} due collection{dueCollections.length > 1 ? 's' : ''} today
+            </summary>
+            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {dueCollections.map(c => (
+                <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderBottom: '1px solid var(--border-soft)' }}>
+                  <span>{c.customer?.name || 'Unknown'} <span style={{ color: 'var(--text-3)' }}>(Sale #{c.sale_id})</span></span>
+                  <strong style={{ color: 'var(--success)' }}>{TK(c.amount)}</strong>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+      </div>
 
       {allocations.length === 0 ? (
         <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-3)' }}>
