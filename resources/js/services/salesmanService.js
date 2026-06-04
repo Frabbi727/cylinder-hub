@@ -10,4 +10,5 @@ export const salesmanService = {
   toggleActive:         (id)            => api.post(`/salesmen/${id}/toggle-active`).then(r => r.data),
   allocate:             (id, data)      => api.post(`/salesmen/${id}/allocate`, data).then(r => r.data),
   reconcile:            (allocId, data) => api.post(`/allocations/${allocId}/reconcile`, data).then(r => r.data),
+  updateReconcile:      (allocId, data) => api.put(`/allocations/${allocId}/reconcile`, data).then(r => r.data),
 };

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\StoreAllocationRequest;
 use App\Http\Requests\Api\StoreSalesmanRequest;
 use App\Models\DueCollection;
+use App\Models\Sale;
 use App\Models\StockAllocation;
 use App\Models\User;
 use App\Repositories\Contracts\SaleRepositoryInterface;
@@ -89,16 +90,24 @@ class SalesmanController extends Controller
             ->whereDate('collection_date', today())
             ->sum('amount');
 
-        $salesCashToday = (float) collect($todaySales)->sum('paid_amount');
+        $salesCashToday       = (float) collect($todaySales)->sum('paid_amount');
+        $todayTotalSales      = (float) collect($todaySales)->sum('total_amount');
+        $todayDueAmount       = (float) $todayTotalSales - $salesCashToday;
+        $totalOutstandingDues = (float) Sale::forSalesman($user->id)
+            ->whereRaw('total_amount > paid_amount')
+            ->sum(\DB::raw('total_amount - paid_amount'));
 
         $stats = [
-            'total_allocated'      => $allocations->sum('qty'),
-            'total_sold'           => $allocations->sum('sold_qty'),
-            'total_returned'       => $allocations->sum('returned_qty'),
-            'total_remaining'      => $allocations->sum('with_salesman'),
-            'cash_collected'       => $salesCashToday,
-            'due_collected_today'  => $dueCollectedToday,
-            'total_cash_to_hand_in'=> $salesCashToday + $dueCollectedToday,
+            'total_allocated'          => $allocations->sum('qty'),
+            'total_sold'               => $allocations->sum('sold_qty'),
+            'total_returned'           => $allocations->sum('returned_qty'),
+            'total_remaining'          => $allocations->sum('with_salesman'),
+            'cash_collected'           => $salesCashToday,
+            'today_total_sales_amount' => $todayTotalSales,
+            'today_due_amount'         => $todayDueAmount,
+            'due_collected_today'      => $dueCollectedToday,
+            'total_cash_to_hand_in'    => $salesCashToday + $dueCollectedToday,
+            'total_outstanding_dues'   => $totalOutstandingDues,
         ];
 
         return $this->success([
@@ -120,6 +129,26 @@ class SalesmanController extends Controller
         );
 
         return $this->created($allocation->load('cylinder'), 'Allocation created.');
+    }
+
+    public function updateReconcile(Request $request, StockAllocation $allocation): JsonResponse
+    {
+        if (!$allocation->is_reconciled) {
+            abort(422, 'This allocation has not been reconciled yet.');
+        }
+
+        $data = $request->validate([
+            'sold_qty'         => 'required|integer|min:0|max:'.$allocation->qty,
+            'collected_amount' => 'required|numeric|min:0',
+        ]);
+
+        $allocation = $this->allocationService->updateReconciliation(
+            $allocation,
+            $data['sold_qty'],
+            (float) $data['collected_amount']
+        );
+
+        return $this->success($allocation, 'Reconciliation updated.');
     }
 
     public function reconcile(Request $request, StockAllocation $allocation): JsonResponse

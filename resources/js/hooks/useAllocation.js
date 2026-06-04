@@ -28,6 +28,7 @@ export function useAllocation() {
   const [showAddSalesman, setShowAddSalesman] = useState(false);
   const [showEditSalesman,setShowEditSalesman]= useState(false);
   const [showReconcile,   setShowReconcile]   = useState(false);
+  const [isEditMode,      setIsEditMode]      = useState(false);
 
   const [selectedSalesman,   setSelectedSalesman]   = useState(null);
   const [selectedAllocation, setSelectedAllocation] = useState(null);
@@ -96,6 +97,18 @@ export function useAllocation() {
     },
   });
 
+  const updateReconcileMutation = useMutation({
+    mutationFn: ({ allocationId, data }) => salesmanService.updateReconcile(allocationId, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['salesmen'] });
+      qc.invalidateQueries({ queryKey: ['stock'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+      setShowReconcile(false);
+      setReconcileForm(RECONCILE_FORM_DEFAULT);
+      setIsEditMode(false);
+    },
+  });
+
   const openAllocate = (salesman) => {
     setSelectedSalesman(salesman);
     setAllocForm(ALLOC_FORM_DEFAULT);
@@ -113,12 +126,26 @@ export function useAllocation() {
   const openReconcile = (salesman, allocation) => {
     setSelectedSalesman(salesman);
     setSelectedAllocation(allocation);
+    setIsEditMode(false);
     setReconcileForm({
       sold_qty:         allocation.sold_qty     ?? 0,
       returned_qty:     allocation.returned_qty ?? 0,
       collected_amount: allocation.collected_amount ?? '',
     });
     reconcileMutation.reset();
+    setShowReconcile(true);
+  };
+
+  const openEditReconcile = (salesman, allocation) => {
+    setSelectedSalesman(salesman);
+    setSelectedAllocation(allocation);
+    setIsEditMode(true);
+    setReconcileForm({
+      sold_qty:         allocation.sold_qty         ?? 0,
+      returned_qty:     allocation.returned_qty     ?? 0,
+      collected_amount: allocation.collected_amount ?? '',
+    });
+    updateReconcileMutation.reset();
     setShowReconcile(true);
   };
 
@@ -150,11 +177,16 @@ export function useAllocation() {
     updateSalesmanError: updateSalesmanMutation.error,
     toggleActive: toggleActiveMutation.mutate,
     showReconcile, setShowReconcile,
+    isEditMode,
     selectedAllocation,
     reconcileForm, setReconcileForm,
     openReconcile,
-    reconcile:     reconcileMutation.mutate,
-    isReconciling: reconcileMutation.isPending,
-    reconcileError:reconcileMutation.error,
+    openEditReconcile,
+    reconcile:            reconcileMutation.mutate,
+    isReconciling:        reconcileMutation.isPending,
+    reconcileError:       reconcileMutation.error,
+    updateReconcile:      updateReconcileMutation.mutate,
+    isUpdatingReconcile:  updateReconcileMutation.isPending,
+    updateReconcileError: updateReconcileMutation.error,
   };
 }

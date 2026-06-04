@@ -116,6 +116,7 @@ Route::prefix('v1')->group(function () {
                 Route::put('salesmen/{user}',                [SalesmanController::class, 'update']);
                 Route::post('salesmen/{user}/toggle-active', [SalesmanController::class, 'toggleActive']);
                 Route::post('salesmen/{user}/allocate',      [SalesmanController::class, 'allocate']);
+                Route::put('allocations/{allocation}/reconcile', [SalesmanController::class, 'updateReconcile']);
 
                 // Expenses — summary/budget before {expense} to avoid conflict
                 Route::get('expenses/summary',         [ExpenseBudgetController::class, 'summary']);

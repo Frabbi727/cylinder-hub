@@ -25,11 +25,6 @@ export function useSales(filters = {}) {
     [allSales]
   );
 
-  const todayCashCollected = useMemo(
-    () => todaySales.reduce((sum, s) => sum + parseFloat(s.paid_amount || 0), 0),
-    [todaySales]
-  );
-
   const deleteMutation = useMutation({
     mutationFn: saleService.remove,
     onSuccess: () => {
@@ -57,7 +52,6 @@ export function useSales(filters = {}) {
     sales:              allSales,
     todaySales,
     outstandingDues,
-    todayCashCollected,
     meta:               allSalesData?.meta,
     isLoading:          isLoading || isTodayLoading,
     payTarget, setPayTarget,

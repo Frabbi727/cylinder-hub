@@ -59,6 +59,49 @@ class AllocationService
         });
     }
 
+    public function updateReconciliation(
+        StockAllocation $allocation,
+        int $newSoldQty,
+        float $newCollectedAmount
+    ): StockAllocation {
+        return DB::transaction(function () use ($allocation, $newSoldQty, $newCollectedAmount) {
+            $oldFilledBack = $allocation->qty - $allocation->sold_qty;
+            $newFilledBack = $allocation->qty - $newSoldQty;
+            $netChange     = $newFilledBack - $oldFilledBack;
+
+            if ($netChange > 0) {
+                $this->stockService->addFilledStock($allocation->cylinder_id, $netChange);
+            } elseif ($netChange < 0) {
+                $this->stockService->removeFilledStock($allocation->cylinder_id, abs($netChange));
+            }
+
+            if ($netChange !== 0) {
+                $this->movements->record(
+                    $allocation->cylinder_id,
+                    'reconcile_adjustment',
+                    $netChange,
+                    auth()->id(),
+                    $allocation->id,
+                    "Admin adjusted Allocation #{$allocation->id}: sold {$allocation->sold_qty}→{$newSoldQty}, stock Δ{$netChange}"
+                );
+            }
+
+            $this->audit->log(
+                'updated', 'Allocation', $allocation->id, auth()->id(),
+                "Admin edited reconciliation #{$allocation->id} — sold {$allocation->sold_qty}→{$newSoldQty}, cash ৳{$allocation->collected_amount}→{$newCollectedAmount}",
+                null, null
+            );
+
+            $allocation->update([
+                'sold_qty'         => $newSoldQty,
+                'returned_qty'     => $allocation->qty - $newSoldQty,
+                'collected_amount' => $newCollectedAmount,
+            ]);
+
+            return $allocation->fresh(['salesman', 'cylinder']);
+        });
+    }
+
     public function reconcile(
         StockAllocation $allocation,
         int $soldQty,

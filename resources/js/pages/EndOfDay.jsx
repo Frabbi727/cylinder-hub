@@ -10,13 +10,18 @@ const TK      = (n) => '৳' + Number(n || 0).toLocaleString('en-US');
 const todayStr = new Date().toISOString().split('T')[0];
 const today    = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-function ReconcileForm({ alloc, onSuccess, onCancel }) {
+function ReconcileForm({ alloc, onSuccess, onCancel, totalOutstandingDues = 0 }) {
   const qc = useQueryClient();
+  const initSold = alloc.sold_qty ?? 0;
+  const initCash = alloc.collected_amount > 0
+    ? alloc.collected_amount
+    : initSold * parseFloat(alloc.sale_price || 0);
   const [form, setForm] = useState({
-    sold_qty:         String(alloc.sold_qty ?? 0),
-    collected_amount: String(alloc.collected_amount ?? ''),
+    sold_qty:         String(initSold),
+    collected_amount: String(initCash),
   });
-  const [error, setError] = useState('');
+  const [error,      setError]      = useState('');
+  const [confirming, setConfirming] = useState(false);
 
   const reconcileMutation = useMutation({
     mutationFn: (data) => salesmanService.reconcile(alloc.id, data),
@@ -24,15 +29,18 @@ function ReconcileForm({ alloc, onSuccess, onCancel }) {
       qc.invalidateQueries({ queryKey: ['my-allocations'] });
       onSuccess();
     },
-    onError: (e) => setError(e.response?.data?.message || 'Failed to reconcile'),
+    onError: (e) => {
+      setError(e.response?.data?.message || 'Failed to reconcile');
+      setConfirming(false);
+    },
   });
 
   const sold         = parseInt(form.sold_qty) || 0;
   const autoReturned = Math.max(0, alloc.qty - sold);
   const overLimit    = sold > alloc.qty;
   const expectedCash = sold * parseFloat(alloc.sale_price || 0);
+  const submittedCash = parseFloat(form.collected_amount) || 0;
 
-  // Auto-fill cash whenever sold qty changes
   const handleSoldChange = (val) => {
     const qty  = parseInt(val) || 0;
     const cash = qty * parseFloat(alloc.sale_price || 0);
@@ -43,10 +51,8 @@ function ReconcileForm({ alloc, onSuccess, onCancel }) {
     e.preventDefault();
     if (overLimit) { setError(`Sold (${sold}) cannot exceed allocated (${alloc.qty}).`); return; }
     setError('');
-    reconcileMutation.mutate({
-      sold_qty:         sold,
-      collected_amount: parseFloat(form.collected_amount) || 0,
-    });
+    if (!confirming) { setConfirming(true); return; }
+    reconcileMutation.mutate({ sold_qty: sold, collected_amount: submittedCash });
   };
 
   return (
@@ -81,67 +87,106 @@ function ReconcileForm({ alloc, onSuccess, onCancel }) {
         </div>
       )}
 
-      <form onSubmit={handleSubmit}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-          {/* Field 1: Sold qty */}
-          <div>
-            <label className="label">How many did you sell? *</label>
-            <input type="number" className="input" min="0" max={alloc.qty}
-              value={form.sold_qty}
-              onChange={e => handleSoldChange(e.target.value)}
-              required />
-            <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
-              Max: {alloc.qty} · Price: {TK(alloc.sale_price)}/pcs
+      {confirming ? (
+        /* ── Confirmation step ── */
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14, color: 'var(--primary)' }}>
+            Please confirm before submitting:
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16, textAlign: 'center' }}>
+            <div style={{ background: '#E6F8EC', borderRadius: 10, padding: '14px 8px' }}>
+              <div style={{ fontWeight: 800, fontSize: 24, color: '#176B3A' }}>{sold}</div>
+              <div style={{ fontSize: 11, color: '#176B3A', marginTop: 3 }}>Cylinders Sold</div>
+            </div>
+            <div style={{ background: '#FFF1DD', borderRadius: 10, padding: '14px 8px' }}>
+              <div style={{ fontWeight: 800, fontSize: 24, color: '#A85200' }}>{autoReturned}</div>
+              <div style={{ fontSize: 11, color: '#A85200', marginTop: 3 }}>Return to Warehouse</div>
+            </div>
+            <div style={{ background: 'var(--primary-soft)', borderRadius: 10, padding: '14px 8px' }}>
+              <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--primary)' }}>{TK(submittedCash)}</div>
+              <div style={{ fontSize: 11, color: 'var(--primary)', marginTop: 3 }}>Cash to Hand In</div>
             </div>
           </div>
-
-          {/* Field 2: Cash — auto-filled, salesman can adjust if needed */}
-          <div>
-            <label className="label">Cash submitted ৳ *</label>
-            <input type="number" className="input" min="0" step="0.01"
-              value={form.collected_amount}
-              onChange={e => setForm(f => ({ ...f, collected_amount: e.target.value }))}
-              required />
-            <div style={{ fontSize: 11, color: expectedCash === parseFloat(form.collected_amount || 0) ? 'var(--success)' : '#A85200', marginTop: 4, fontWeight: 500 }}>
-              {expectedCash === parseFloat(form.collected_amount || 0)
-                ? `✓ Matches: ${sold} × ${TK(alloc.sale_price)}`
-                : `Expected: ${TK(expectedCash)} — adjust if partial collected`}
+          {submittedCash < expectedCash && (
+            <div style={{ background: '#FFF1DD', border: '1px solid #FF9500', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: 12, color: '#A85200', display: 'flex', gap: 6 }}>
+              <AlertCircle size={14} style={{ marginTop: 1, flexShrink: 0 }} />
+              <span>Cash ({TK(submittedCash)}) is less than expected ({TK(expectedCash)}). The difference of {TK(expectedCash - submittedCash)} will remain as customer dues.</span>
             </div>
+          )}
+          {totalOutstandingDues > 0 && (
+            <div style={{ background: '#FEF2F2', border: '1px solid #B83030', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 12, color: '#B83030', display: 'flex', gap: 6 }}>
+              <AlertCircle size={14} style={{ marginTop: 1, flexShrink: 0 }} />
+              <span>After submission you will still have <strong>{TK(totalOutstandingDues)}</strong> outstanding from previous sales. Collect when customers are available.</span>
+            </div>
+          )}
+          <div style={{ background: 'var(--surface)', borderRadius: 8, padding: '8px 14px', marginBottom: 16, fontSize: 12, color: 'var(--text-3)' }}>
+            ⚠ This action cannot be undone by you. Only admin can edit after submission.
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <button type="button" className="btn btn-ghost" onClick={() => setConfirming(false)}>← Back</button>
+            <button className="btn btn-primary" onClick={() => reconcileMutation.mutate({ sold_qty: sold, collected_amount: submittedCash })} disabled={reconcileMutation.isPending}>
+              {reconcileMutation.isPending ? 'Submitting...' : 'Confirm & Submit'}
+            </button>
           </div>
         </div>
-
-        {/* Auto-calculated summary — read only */}
-        <div style={{ background: 'var(--surface)', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
-          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 10, fontWeight: 600 }}>
-            Automatic calculation:
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, textAlign: 'center' }}>
-            <div style={{ background: '#E6F8EC', borderRadius: 8, padding: '10px 8px' }}>
-              <div style={{ fontWeight: 800, fontSize: 20, color: '#176B3A' }}>{sold}</div>
-              <div style={{ fontSize: 11, color: '#176B3A', marginTop: 2 }}>Sold ✓</div>
-            </div>
-            <div style={{ background: '#FFF1DD', borderRadius: 8, padding: '10px 8px' }}>
-              <div style={{ fontWeight: 800, fontSize: 20, color: '#A85200' }}>{autoReturned}</div>
-              <div style={{ fontSize: 11, color: '#A85200', marginTop: 2 }}>Return to warehouse</div>
-            </div>
-            <div style={{ background: overLimit ? '#FFE5E3' : '#E6F0F1', borderRadius: 8, padding: '10px 8px' }}>
-              <div style={{ fontWeight: 800, fontSize: 20, color: overLimit ? '#B83030' : 'var(--primary)' }}>
-                {overLimit ? '⚠' : '✓'}
+      ) : (
+        /* ── Input form ── */
+        <form onSubmit={handleSubmit}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+            <div>
+              <label className="label">How many did you sell? *</label>
+              <input type="number" className="input" min="0" max={alloc.qty}
+                value={form.sold_qty}
+                onChange={e => handleSoldChange(e.target.value)}
+                required />
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
+                Max: {alloc.qty} · Price: {TK(alloc.sale_price)}/pcs
               </div>
-              <div style={{ fontSize: 11, color: overLimit ? '#B83030' : 'var(--primary)', marginTop: 2 }}>
-                {overLimit ? 'Exceeds limit!' : `${sold} + ${autoReturned} = ${alloc.qty}`}
+            </div>
+            <div>
+              <label className="label">Cash submitted ৳ *</label>
+              <input type="number" className="input" min="0" step="0.01"
+                value={form.collected_amount}
+                onChange={e => setForm(f => ({ ...f, collected_amount: e.target.value }))}
+                required />
+              <div style={{ fontSize: 11, color: submittedCash === expectedCash ? 'var(--success)' : '#A85200', marginTop: 4, fontWeight: 500 }}>
+                {submittedCash === expectedCash
+                  ? `✓ Matches: ${sold} × ${TK(alloc.sale_price)}`
+                  : `Expected: ${TK(expectedCash)} — adjust if partial collected`}
               </div>
             </div>
           </div>
-        </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button type="button" className="btn btn-ghost" onClick={onCancel}>Cancel</button>
-          <button type="submit" className="btn btn-primary" disabled={reconcileMutation.isPending || overLimit}>
-            {reconcileMutation.isPending ? 'Submitting...' : 'Submit Reconciliation'}
-          </button>
-        </div>
-      </form>
+          <div style={{ background: 'var(--surface)', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 10, fontWeight: 600 }}>Automatic calculation:</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, textAlign: 'center' }}>
+              <div style={{ background: '#E6F8EC', borderRadius: 8, padding: '10px 8px' }}>
+                <div style={{ fontWeight: 800, fontSize: 20, color: '#176B3A' }}>{sold}</div>
+                <div style={{ fontSize: 11, color: '#176B3A', marginTop: 2 }}>Sold ✓</div>
+              </div>
+              <div style={{ background: '#FFF1DD', borderRadius: 8, padding: '10px 8px' }}>
+                <div style={{ fontWeight: 800, fontSize: 20, color: '#A85200' }}>{autoReturned}</div>
+                <div style={{ fontSize: 11, color: '#A85200', marginTop: 2 }}>Return to warehouse</div>
+              </div>
+              <div style={{ background: overLimit ? '#FFE5E3' : '#E6F0F1', borderRadius: 8, padding: '10px 8px' }}>
+                <div style={{ fontWeight: 800, fontSize: 20, color: overLimit ? '#B83030' : 'var(--primary)' }}>
+                  {overLimit ? '⚠' : '✓'}
+                </div>
+                <div style={{ fontSize: 11, color: overLimit ? '#B83030' : 'var(--primary)', marginTop: 2 }}>
+                  {overLimit ? 'Exceeds limit!' : `${sold} + ${autoReturned} = ${alloc.qty}`}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <button type="button" className="btn btn-ghost" onClick={onCancel}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={overLimit}>
+              Review & Submit →
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }
@@ -170,12 +215,14 @@ export default function EndOfDay() {
   const dueCollectedTotal = dueData?.data?.total ?? 0;
 
   const stats = {
-    totalSold:         apiStats.total_sold       ?? 0,
-    totalReturned:     apiStats.total_returned   ?? 0,
-    totalCash:         apiStats.cash_collected   ?? 0,
-    totalAllocated:    apiStats.total_allocated  ?? 0,
-    dueCollected:      apiStats.due_collected_today ?? dueCollectedTotal,
-    totalCashToHandIn: apiStats.total_cash_to_hand_in ?? ((apiStats.cash_collected ?? 0) + dueCollectedTotal),
+    totalSold:            apiStats.total_sold           ?? 0,
+    totalReturned:        apiStats.total_returned       ?? 0,
+    totalCash:            apiStats.cash_collected       ?? 0,
+    totalAllocated:       apiStats.total_allocated      ?? 0,
+    todayDueAmount:       apiStats.today_due_amount     ?? 0,
+    dueCollected:         apiStats.due_collected_today   ?? 0,
+    totalCashToHandIn:    apiStats.total_cash_to_hand_in ?? 0,
+    totalOutstandingDues: apiStats.total_outstanding_dues ?? 0,
   };
 
   if (isLoading) return <LoadingSpinner text="Loading allocations..." />;
@@ -204,6 +251,12 @@ export default function EndOfDay() {
               <span>Cylinder sales collected</span>
               <strong>{TK(stats.totalCash)}</strong>
             </div>
+            {stats.todayDueAmount > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                <span style={{ color: '#A85200' }}>Today's dues (to collect later)</span>
+                <strong style={{ color: '#A85200' }}>{TK(stats.todayDueAmount)}</strong>
+              </div>
+            )}
             {stats.dueCollected > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
                 <span>Previous dues collected</span>
@@ -214,6 +267,14 @@ export default function EndOfDay() {
               <span>Total to hand in</span>
               <span style={{ color: 'var(--primary)' }}>{TK(stats.totalCashToHandIn)}</span>
             </div>
+            {stats.totalOutstandingDues > 0 && (
+              <div style={{ marginTop: 10, padding: '8px 12px', background: '#FEF2F2', borderRadius: 8, display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: '#B83030', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <AlertCircle size={13} /> Still outstanding
+                </span>
+                <strong style={{ color: '#B83030' }}>{TK(stats.totalOutstandingDues)}</strong>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -254,6 +315,12 @@ export default function EndOfDay() {
             <span style={{ color: 'var(--text-3)' }}>From today's cylinder sales</span>
             <strong>{TK(stats.totalCash)}</strong>
           </div>
+          {stats.todayDueAmount > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: '#A85200' }}>Today's dues (to collect later)</span>
+              <strong style={{ color: '#A85200' }}>{TK(stats.todayDueAmount)}</strong>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ color: 'var(--text-3)' }}>From previous due collections today</span>
             <strong style={{ color: stats.dueCollected > 0 ? 'var(--success)' : 'var(--text-3)' }}>
@@ -264,6 +331,14 @@ export default function EndOfDay() {
             <span>Total cash to hand in</span>
             <span style={{ color: 'var(--primary)' }}>{TK(stats.totalCashToHandIn)}</span>
           </div>
+          {stats.totalOutstandingDues > 0 && (
+            <div style={{ marginTop: 10, padding: '8px 12px', background: '#FEF2F2', borderRadius: 8, display: 'flex', justifyContent: 'space-between', fontSize: 13, alignItems: 'center' }}>
+              <span style={{ color: '#B83030', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <AlertCircle size={13} /> Still outstanding (all pending dues)
+              </span>
+              <strong style={{ color: '#B83030' }}>{TK(stats.totalOutstandingDues)}</strong>
+            </div>
+          )}
         </div>
         {dueCollections.length > 0 && (
           <details style={{ marginTop: 12 }}>
@@ -307,7 +382,11 @@ export default function EndOfDay() {
                   <div style={{ display: 'flex', gap: 16, textAlign: 'center', fontSize: 12 }}>
                     <div><div style={{ fontWeight: 700, fontSize: 16 }}>{a.qty}</div><div style={{ color: 'var(--text-3)' }}>Allocated</div></div>
                     <div><div style={{ fontWeight: 700, fontSize: 16, color: 'var(--success)' }}>{a.sold_qty || 0}</div><div style={{ color: 'var(--text-3)' }}>Sold</div></div>
-                    <div><div style={{ fontWeight: 700, fontSize: 16, color: 'var(--warning)' }}>{a.returned_qty || 0}</div><div style={{ color: 'var(--text-3)' }}>Returned</div></div>
+                    {a.is_reconciled ? (
+                      <div><div style={{ fontWeight: 700, fontSize: 16, color: 'var(--warning)' }}>{a.returned_qty || 0}</div><div style={{ color: 'var(--text-3)' }}>Returned</div></div>
+                    ) : (
+                      <div><div style={{ fontWeight: 700, fontSize: 16, color: '#A85200' }}>{Math.max(0, a.qty - (a.sold_qty || 0))}</div><div style={{ color: '#A85200', fontWeight: 600 }}>To Return</div></div>
+                    )}
                   </div>
                   {a.is_reconciled ? (
                     <span className="pill pill-teal" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -327,6 +406,7 @@ export default function EndOfDay() {
                     alloc={a}
                     onSuccess={() => setActiveAlloc(null)}
                     onCancel={() => setActiveAlloc(null)}
+                    totalOutstandingDues={stats.totalOutstandingDues}
                   />
                 )}
               </div>

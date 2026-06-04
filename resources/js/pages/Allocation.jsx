@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import CylBadge   from '../components/ui/CylBadge';
 import Modal      from '../components/ui/Modal';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
-import { Plus, Truck, CheckCircle, UserPlus, Edit2, Power, AlertCircle, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Truck, CheckCircle, UserPlus, Edit2, Power, AlertCircle, RotateCcw, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
 
 const TK = (n) => '৳' + Number(n || 0).toLocaleString('en-US');
 const todayStr = new Date().toISOString().split('T')[0];
@@ -38,10 +38,13 @@ export default function Allocation() {
     updateSalesman, isUpdatingSalesman, updateSalesmanError,
     toggleActive,
     showReconcile, setShowReconcile,
+    isEditMode,
     selectedAllocation,
     reconcileForm, setReconcileForm,
     openReconcile,
+    openEditReconcile,
     reconcile, isReconciling, reconcileError,
+    updateReconcile, isUpdatingReconcile, updateReconcileError,
   } = useAllocation();
 
   const activeSalesmen = allocationSummary.active_count    ?? 0;
@@ -170,14 +173,22 @@ export default function Allocation() {
                           </div>
                         </div>
                       </div>
-                      {alloc.is_reconciled
-                        ? <span className="pill pill-teal" style={{ fontSize:11 }}>✓ {t('status.reconciled')}</span>
-                        : isToday && (
-                          <button className="btn btn-soft btn-sm" style={{ fontSize:12,padding:'4px 10px' }} onClick={() => openReconcile(sm, alloc)}>
-                            <RotateCcw size={12} /> {t('allocation.reconcile')}
-                          </button>
-                        )
-                      }
+                      {alloc.is_reconciled ? (
+                        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                          <span className="pill pill-teal" style={{ fontSize:11 }}>✓ {t('status.reconciled')}</span>
+                          {isAdmin && (
+                            <button className="btn btn-ghost btn-sm" style={{ padding:'3px 8px' }}
+                              title="Edit reconciliation"
+                              onClick={() => openEditReconcile(sm, alloc)}>
+                              <Pencil size={12} />
+                            </button>
+                          )}
+                        </div>
+                      ) : isToday && (
+                        <button className="btn btn-soft btn-sm" style={{ fontSize:12,padding:'4px 10px' }} onClick={() => openReconcile(sm, alloc)}>
+                          <RotateCcw size={12} /> {t('allocation.reconcile')}
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -353,69 +364,85 @@ export default function Allocation() {
         </Modal>
       )}
 
-      {/* RECONCILE MODAL */}
-      {showReconcile && selectedSalesman && selectedAllocation && (
-        <Modal title={t('allocation.endOfDayReconcile')} onClose={() => setShowReconcile(false)} size="md">
-          <ErrorBanner error={reconcileError} />
-          <div style={{ background:'var(--primary-soft)', borderRadius:10, padding:'12px 16px', marginBottom:20 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                {selectedAllocation.cylinder && <CylBadge cylinder={selectedAllocation.cylinder} size="sm" />}
-                <div>
-                  <div style={{ fontWeight:600 }}>{selectedAllocation.cylinder?.name} {selectedAllocation.cylinder?.size}</div>
-                  <div className="dim tiny">{selectedSalesman.name}</div>
-                </div>
-              </div>
-              <div style={{ textAlign:'right' }}>
-                <div style={{ fontSize:20, fontWeight:700, color:'var(--primary)' }}>{selectedAllocation.qty}</div>
-                <div className="dim tiny">{t('allocation.totalAllocated')}</div>
-              </div>
-            </div>
-          </div>
-          <div style={{ background:'var(--bg)', borderRadius:8, padding:'10px 14px', marginBottom:20 }}>
-            <div className="dim tiny" style={{ marginBottom:4 }}>{t('allocation.currentlyRecorded')}</div>
-            <div style={{ display:'flex', gap:20 }}>
-              <div><span style={{ fontWeight:600, color:'var(--success)' }}>{selectedAllocation.sold_qty||0}</span> <span className="dim tiny">{t('allocation.sold')}</span></div>
-              <div><span style={{ fontWeight:600, color:'var(--warning)' }}>{selectedAllocation.returned_qty||0}</span> <span className="dim tiny">{t('allocation.returned')}</span></div>
-            </div>
-          </div>
-          <form onSubmit={e => { e.preventDefault(); reconcile({ allocationId: selectedAllocation.id, data: { sold_qty: parseInt(reconcileForm.sold_qty)||0, returned_qty: parseInt(reconcileForm.returned_qty)||0, collected_amount: parseFloat(reconcileForm.collected_amount)||0 } }); }}>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
-              <div>
-                <label className="label">{t('allocation.actualSoldQty')} *</label>
-                <input type="number" className="input" min="0" max={selectedAllocation.qty}
-                  value={reconcileForm.sold_qty} onChange={e => setReconcileForm(f => ({...f, sold_qty: e.target.value}))} required />
-                <div className="dim tiny" style={{ marginTop:4 }}>Max: {selectedAllocation.qty}</div>
-              </div>
-              <div>
-                <label className="label">{t('allocation.emptyCylindersReturned')} *</label>
-                <input type="number" className="input" min="0"
-                  value={reconcileForm.returned_qty} onChange={e => setReconcileForm(f => ({...f, returned_qty: e.target.value}))} required />
-              </div>
-            </div>
-            <div style={{ marginBottom:16 }}>
-              <label className="label">{t('allocation.cashCollected')} *</label>
-              <input type="number" className="input" min="0" step="0.01"
-                value={reconcileForm.collected_amount} onChange={e => setReconcileForm(f => ({...f, collected_amount: e.target.value}))} required />
-            </div>
-            {reconcileForm.sold_qty !== '' && (
-              <div style={{ background:'var(--bg)', borderRadius:8, padding:'10px 14px', marginBottom:16 }}>
-                <div className="dim tiny" style={{ marginBottom:4 }}>{t('allocation.afterReconcile')}</div>
-                <div>
-                  <span style={{ fontWeight:600 }}>{Math.max(0, selectedAllocation.qty - parseInt(reconcileForm.sold_qty||0) - parseInt(reconcileForm.returned_qty||0))}</span>
-                  <span className="dim tiny"> {t('allocation.unsoldWillRestore')}</span>
-                </div>
+      {/* RECONCILE / EDIT RECONCILE MODAL */}
+      {showReconcile && selectedSalesman && selectedAllocation && (() => {
+        const soldVal      = parseInt(reconcileForm.sold_qty) || 0;
+        const toReturn     = Math.max(0, selectedAllocation.qty - soldVal);
+        const isBusy       = isEditMode ? isUpdatingReconcile : isReconciling;
+        const activeError  = isEditMode ? updateReconcileError : reconcileError;
+        const submitFn     = () => {
+          const payload = { sold_qty: soldVal, collected_amount: parseFloat(reconcileForm.collected_amount) || 0 };
+          if (isEditMode) updateReconcile({ allocationId: selectedAllocation.id, data: payload });
+          else            reconcile({ allocationId: selectedAllocation.id, data: payload });
+        };
+        return (
+          <Modal
+            title={isEditMode ? `Edit Reconciliation — ${selectedSalesman.name}` : t('allocation.endOfDayReconcile')}
+            onClose={() => setShowReconcile(false)} size="md">
+            {isEditMode && (
+              <div style={{ background:'#FFF8E1', border:'1px solid #FF9500', borderRadius:8, padding:'10px 14px', marginBottom:16, fontSize:13, color:'#A85200', display:'flex', gap:8 }}>
+                <AlertCircle size={15} style={{ marginTop:1, flexShrink:0 }} />
+                <span>Admin edit — changes will adjust warehouse stock accordingly.</span>
               </div>
             )}
-            <div style={{ display:'flex', justifyContent:'flex-end', gap:8, marginTop:20 }}>
-              <button type="button" className="btn btn-ghost" onClick={() => setShowReconcile(false)}>{t('common.cancel')}</button>
-              <button type="submit" className="btn btn-primary" disabled={isReconciling}>
-                {isReconciling ? t('allocation.reconciling') : t('allocation.confirmReconcile')}
-              </button>
+            <ErrorBanner error={activeError} />
+            <div style={{ background:'var(--primary-soft)', borderRadius:10, padding:'12px 16px', marginBottom:16 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  {selectedAllocation.cylinder && <CylBadge cylinder={selectedAllocation.cylinder} size="sm" />}
+                  <div>
+                    <div style={{ fontWeight:600 }}>{selectedAllocation.cylinder?.name} {selectedAllocation.cylinder?.size}</div>
+                    <div className="dim tiny">{selectedSalesman.name} · {TK(selectedAllocation.sale_price)}/pcs</div>
+                  </div>
+                </div>
+                <div style={{ textAlign:'right' }}>
+                  <div style={{ fontSize:20, fontWeight:700, color:'var(--primary)' }}>{selectedAllocation.qty}</div>
+                  <div className="dim tiny">{t('allocation.totalAllocated')}</div>
+                </div>
+              </div>
             </div>
-          </form>
-        </Modal>
-      )}
+            <form onSubmit={e => { e.preventDefault(); submitFn(); }}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
+                <div>
+                  <label className="label">{t('allocation.actualSoldQty')} *</label>
+                  <input type="number" className="input" min="0" max={selectedAllocation.qty}
+                    value={reconcileForm.sold_qty}
+                    onChange={e => {
+                      const qty  = parseInt(e.target.value) || 0;
+                      const cash = qty * parseFloat(selectedAllocation.sale_price || 0);
+                      setReconcileForm(f => ({ ...f, sold_qty: e.target.value, collected_amount: String(cash) }));
+                    }} required />
+                  <div className="dim tiny" style={{ marginTop:4 }}>Max: {selectedAllocation.qty}</div>
+                </div>
+                <div>
+                  <label className="label">{t('allocation.cashCollected')} *</label>
+                  <input type="number" className="input" min="0" step="0.01"
+                    value={reconcileForm.collected_amount}
+                    onChange={e => setReconcileForm(f => ({...f, collected_amount: e.target.value}))} required />
+                  <div className="dim tiny" style={{ marginTop:4 }}>
+                    Expected: {TK(soldVal * parseFloat(selectedAllocation.sale_price || 0))}
+                  </div>
+                </div>
+              </div>
+              {reconcileForm.sold_qty !== '' && (
+                <div style={{ background:'var(--bg)', borderRadius:8, padding:'10px 14px', marginBottom:16, display:'flex', gap:20 }}>
+                  <div><span style={{ fontWeight:700, color:'var(--success)' }}>{soldVal}</span> <span className="dim tiny">sold</span></div>
+                  <div><span style={{ fontWeight:700, color:'#A85200' }}>{toReturn}</span> <span className="dim tiny">return to warehouse</span></div>
+                  <div><span style={{ fontWeight:700, color:'var(--primary)' }}>{TK(parseFloat(reconcileForm.collected_amount)||0)}</span> <span className="dim tiny">cash collected</span></div>
+                </div>
+              )}
+              <div style={{ display:'flex', justifyContent:'flex-end', gap:8, marginTop:20 }}>
+                <button type="button" className="btn btn-ghost" onClick={() => setShowReconcile(false)}>{t('common.cancel')}</button>
+                <button type="submit" className="btn btn-primary" disabled={isBusy}>
+                  {isBusy
+                    ? (isEditMode ? 'Saving...' : t('allocation.reconciling'))
+                    : (isEditMode ? 'Save Changes' : t('allocation.confirmReconcile'))}
+                </button>
+              </div>
+            </form>
+          </Modal>
+        );
+      })()}
     </div>
   );
 }

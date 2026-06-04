@@ -101,7 +101,7 @@ export default function Sales() {
   const [filterSearch, setFilterSearch]     = useState('');
 
   const {
-    sales, todaySales, outstandingDues, todayCashCollected,
+    sales, todaySales, outstandingDues,
     isLoading, deleteSale, isDeleting,
     payTarget, setPayTarget, payBalance, isPaying, payError,
   } = useSales({ from: filterFrom || undefined, to: filterTo || undefined, payment_type: filterPayment || undefined, search: filterSearch || undefined });
@@ -138,9 +138,11 @@ export default function Sales() {
   const totalSold          = apiStats.total_sold           ?? 0;
   const totalReturned      = apiStats.total_returned       ?? 0;
   const totalRemaining     = apiStats.total_remaining      ?? 0;
-  const totalCashCollected = apiStats.cash_collected       ?? todayCashCollected;
-  const dueCollectedToday  = apiStats.due_collected_today  ?? 0;
-  const totalCashToHandIn  = apiStats.total_cash_to_hand_in ?? (totalCashCollected + dueCollectedToday);
+  const totalCashCollected   = apiStats.cash_collected           ?? 0;
+  const dueCollectedToday    = apiStats.due_collected_today      ?? 0;
+  const totalCashToHandIn    = apiStats.total_cash_to_hand_in    ?? 0;
+  const todayTotalSalesAmt   = apiStats.today_total_sales_amount ?? 0;
+  const todayDueAmt          = apiStats.today_due_amount         ?? 0;
 
   // All cylinders for empty return dropdown
   const { data: cylinders } = useQuery({
@@ -378,9 +380,9 @@ export default function Sales() {
         ) : (
           <>
             <div style={{ display:'flex', gap:16, marginBottom:12, padding:'8px 14px', background:'var(--bg)', borderRadius:8, fontSize:13 }}>
-              <span className="dim">{t('common.total')}: <strong>{TK(todaySales.reduce((s,x) => s+parseFloat(x.total_amount||0),0))}</strong></span>
-              <span style={{ color:'var(--success)' }}>{t('common.paid')}: <strong>{TK(todaySales.reduce((s,x) => s+parseFloat(x.paid_amount||0),0))}</strong></span>
-              <span style={{ color:'var(--accent)' }}>{t('common.due')}: <strong>{TK(todaySales.reduce((s,x) => s+parseFloat(x.due_amount||0),0))}</strong></span>
+              <span className="dim">{t('common.total')}: <strong>{TK(todayTotalSalesAmt)}</strong></span>
+              <span style={{ color:'var(--success)' }}>{t('common.paid')}: <strong>{TK(totalCashCollected)}</strong></span>
+              <span style={{ color:'var(--accent)' }}>{t('common.due')}: <strong>{TK(todayDueAmt)}</strong></span>
             </div>
             {todaySales.map(s => <SaleCard key={s.id} sale={s} onPay={openPay} t={t} onView={() => navigate(`/sales/${s.id}`)} />)}
           </>
