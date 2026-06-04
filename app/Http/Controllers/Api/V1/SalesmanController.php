@@ -115,15 +115,25 @@ class SalesmanController extends Controller
             ->whereRaw('total_amount > paid_amount')
             ->sum(\DB::raw('total_amount - paid_amount'));
 
+        // Per-sale due collections: needed to strip subsequent payments from the
+        // cylinder cash pool so it reflects only sale-time cash (not "due later" payments).
+        $dueCollectionBySale = empty($todaySaleIds) ? [] :
+            DueCollection::whereIn('sale_id', $todaySaleIds)
+                ->select('sale_id', \DB::raw('SUM(amount) as total'))
+                ->groupBy('sale_id')
+                ->pluck('total', 'sale_id')
+                ->toArray();
+
         // Build per-cylinder cash breakdown from today's sales (proportional split).
-        // Each sale's paid_amount is distributed across its items by their share of
-        // the sale total, so we know how much cash each cylinder type actually brought in.
+        // Use sale-time cash only (paid_amount minus any subsequent due collections)
+        // so the pool is not inflated by payments made after the initial sale.
         $cylinderCashMap = [];
         $cylinderDuesMap = [];
         foreach ($todaySales as $sale) {
-            $saleTotal  = (float) $sale->total_amount;
-            $paidAmount = (float) $sale->paid_amount;
-            $saleDue    = max(0.0, $saleTotal - $paidAmount);
+            $saleTotal    = (float) $sale->total_amount;
+            $dueCollected = (float) ($dueCollectionBySale[$sale->id] ?? 0);
+            $saleCash     = max(0.0, (float) $sale->paid_amount - $dueCollected);
+            $saleDue      = max(0.0, $saleTotal - (float) $sale->paid_amount);
             if ($saleTotal <= 0) continue;
             $customerName = $sale->customer?->name ?? 'Walk-in';
             foreach ($sale->items as $item) {
@@ -131,7 +141,7 @@ class SalesmanController extends Controller
                 $proportion = $lineTotal / $saleTotal;
                 $cid        = $item->cylinder_id;
                 $cylinderCashMap[$cid] = ($cylinderCashMap[$cid] ?? 0.0)
-                    + round($paidAmount * $proportion, 2);
+                    + round($saleCash * $proportion, 2);
                 $itemDue = round($saleDue * $proportion, 2);
                 if ($itemDue > 0) {
                     $cylinderDuesMap[$cid][] = [
@@ -158,19 +168,25 @@ class SalesmanController extends Controller
                 $isToday  = $alloc->allocation_date === $todayStr;
 
                 if ($alloc->is_reconciled) {
-                    // Finalized: use the reconciled collected_amount for display.
-                    // Only drain today's pool if this allocation was today — previous-day
-                    // allocations' sales are not included in today's cylinderCashMap.
+                    // Finalized value; drain pool by actual collected (not expected) so
+                    // unpaid dues don't over-consume. Cap drain at pool to prevent going negative.
                     $actual = round((float) $alloc->collected_amount, 2);
-                    $drain  = $isToday ? $actual : 0.0;
+                    $drain  = $isToday ? min($actual, $pool) : 0.0;
                 } elseif ($isToday) {
-                    // Today's unreconciled: prefer per-allocation tracking if set (new sales),
-                    // otherwise consume from what's left in the pool.
                     $fromAlloc = round((float) $alloc->collected_amount, 2);
-                    $actual    = $fromAlloc > 0 ? $fromAlloc : min($pool, $expected);
-                    $drain     = $actual;
+                    if ($fromAlloc > 0) {
+                        // New data: SaleService wrote the exact sale-time cash per allocation.
+                        // Use it directly — bypasses any pool distortion from reconciled
+                        // allocs or "due later" payments inflating paid_amount.
+                        $actual = $fromAlloc;
+                    } else {
+                        // Old data (pre-fix): pool already strips due collections (see above),
+                        // so min(pool, expected) gives the best available approximation.
+                        $actual = min($pool, $expected);
+                    }
+                    $drain = min($actual, $pool); // never drain more than pool holds
                 } else {
-                    // Previous-day unreconciled: sales not in today's pool.
+                    // Previous-day unreconciled: its sales are not in today's pool.
                     $actual = round((float) $alloc->collected_amount, 2);
                     $drain  = 0.0;
                 }
