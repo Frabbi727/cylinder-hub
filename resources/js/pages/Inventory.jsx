@@ -112,8 +112,8 @@ export default function Inventory() {
   const [editTarget, setEditTarget] = useState(null);
   const [editForm,   setEditForm]   = useState(emptyForm);
 
-  const totalFilled  = cylinders.reduce((s, c) => s + (c.stock?.filled_qty || 0), 0);
-  const totalEmpty   = cylinders.reduce((s, c) => s + (c.stock?.empty_qty  || 0), 0);
+  const totalFilled  = cylinders.reduce((s, c) => s + (Number(c.stock?.filled_qty) || 0), 0);
+  const totalEmpty   = cylinders.reduce((s, c) => s + (Number(c.stock?.empty_qty)  || 0), 0);
   const belowReorder = cylinders.filter(c => c.status === 'active' && (c.stock?.filled_qty || 0) <= c.reorder_level).length;
 
   const openEdit = (c) => {
