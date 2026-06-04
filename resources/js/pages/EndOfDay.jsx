@@ -10,7 +10,7 @@ const TK      = (n) => '৳' + Number(n || 0).toLocaleString('en-US');
 const todayStr = new Date().toISOString().split('T')[0];
 const today    = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-function ReconcileForm({ alloc, onSuccess, onCancel, totalOutstandingDues = 0 }) {
+function ReconcileForm({ alloc, onSuccess, onCancel, totalOutstandingDues = 0, pendingDues = 0 }) {
   const qc = useQueryClient();
   const initSold = alloc.sold_qty ?? 0;
   const initCash = alloc.collected_amount > 0
@@ -113,10 +113,16 @@ function ReconcileForm({ alloc, onSuccess, onCancel, totalOutstandingDues = 0 })
               <span>Cash ({TK(submittedCash)}) is less than expected ({TK(expectedCash)}). The difference of {TK(expectedCash - submittedCash)} will remain as customer dues.</span>
             </div>
           )}
+          {pendingDues > 0 && (
+            <div style={{ background: '#E6F8EC', border: '1px solid var(--success)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 12, color: '#176B3A', display: 'flex', gap: 6 }}>
+              <CheckCircle size={14} style={{ marginTop: 1, flexShrink: 0 }} />
+              <span><strong>{TK(pendingDues)}</strong> in pending due collections will also be submitted with this EOD.</span>
+            </div>
+          )}
           {totalOutstandingDues > 0 && (
             <div style={{ background: '#FEF2F2', border: '1px solid #B83030', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 12, color: '#B83030', display: 'flex', gap: 6 }}>
               <AlertCircle size={14} style={{ marginTop: 1, flexShrink: 0 }} />
-              <span>After submission you will still have <strong>{TK(totalOutstandingDues)}</strong> outstanding from previous sales. Collect when customers are available.</span>
+              <span>After submission, <strong>{TK(totalOutstandingDues)}</strong> will still be outstanding. Collect when customers are available.</span>
             </div>
           )}
           <div style={{ background: 'var(--surface)', borderRadius: 8, padding: '8px 14px', marginBottom: 16, fontSize: 12, color: 'var(--text-3)' }}>
@@ -201,28 +207,20 @@ export default function EndOfDay() {
     enabled:  !!user?.id,
   });
 
-  const { data: dueData } = useQuery({
-    queryKey: ['daily-collections', user?.id, todayStr],
-    queryFn:  () => salesmanService.getDailyCollections(user.id),
-    enabled:  !!user?.id,
-    refetchInterval: 30_000,
-  });
-
-  const allocations       = myData?.data?.salesman?.allocations || [];
-  const allReconciled     = allocations.length > 0 && allocations.every(a => a.is_reconciled);
-  const apiStats          = myData?.data?.stats ?? {};
-  const dueCollections    = dueData?.data?.collections || [];
-  const dueCollectedTotal = dueData?.data?.total ?? 0;
+  const allocations        = myData?.data?.salesman?.allocations || [];
+  const allReconciled      = allocations.length > 0 && allocations.every(a => a.is_reconciled);
+  const apiStats           = myData?.data?.stats ?? {};
+  const pendingCollections = myData?.data?.pending_collections || [];
 
   const stats = {
-    totalSold:            apiStats.total_sold           ?? 0,
-    totalReturned:        apiStats.total_returned       ?? 0,
-    totalCash:            apiStats.cash_collected       ?? 0,
-    totalAllocated:       apiStats.total_allocated      ?? 0,
-    todayDueAmount:       apiStats.today_due_amount     ?? 0,
-    dueCollected:         apiStats.due_collected_today   ?? 0,
-    totalCashToHandIn:    apiStats.total_cash_to_hand_in ?? 0,
-    totalOutstandingDues: apiStats.total_outstanding_dues ?? 0,
+    totalSold:            apiStats.total_sold              ?? 0,
+    totalReturned:        apiStats.total_returned          ?? 0,
+    totalCash:            apiStats.cash_collected          ?? 0,
+    totalAllocated:       apiStats.total_allocated         ?? 0,
+    todayDueAmount:       apiStats.today_due_amount        ?? 0,
+    pendingDues:          apiStats.pending_due_collections ?? 0,
+    totalCashToHandIn:    apiStats.total_cash_to_hand_in   ?? 0,
+    totalOutstandingDues: apiStats.total_outstanding_dues  ?? 0,
   };
 
   if (isLoading) return <LoadingSpinner text="Loading allocations..." />;
@@ -255,12 +253,6 @@ export default function EndOfDay() {
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
                 <span style={{ color: '#A85200' }}>Today's dues (to collect later)</span>
                 <strong style={{ color: '#A85200' }}>{TK(stats.todayDueAmount)}</strong>
-              </div>
-            )}
-            {stats.dueCollected > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-                <span>Previous dues collected</span>
-                <strong style={{ color: 'var(--success)' }}>{TK(stats.dueCollected)}</strong>
               </div>
             )}
             <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800 }}>
@@ -322,9 +314,11 @@ export default function EndOfDay() {
             </div>
           )}
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: 'var(--text-3)' }}>From previous due collections today</span>
-            <strong style={{ color: stats.dueCollected > 0 ? 'var(--success)' : 'var(--text-3)' }}>
-              {TK(stats.dueCollected)}
+            <span style={{ color: stats.pendingDues > 0 ? 'var(--success)' : 'var(--text-3)' }}>
+              Pending due collections {stats.pendingDues > 0 ? `(${pendingCollections.length})` : ''}
+            </span>
+            <strong style={{ color: stats.pendingDues > 0 ? 'var(--success)' : 'var(--text-3)' }}>
+              {TK(stats.pendingDues)}
             </strong>
           </div>
           <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 6, display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: 15 }}>
@@ -334,21 +328,24 @@ export default function EndOfDay() {
           {stats.totalOutstandingDues > 0 && (
             <div style={{ marginTop: 10, padding: '8px 12px', background: '#FEF2F2', borderRadius: 8, display: 'flex', justifyContent: 'space-between', fontSize: 13, alignItems: 'center' }}>
               <span style={{ color: '#B83030', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <AlertCircle size={13} /> Still outstanding (all pending dues)
+                <AlertCircle size={13} /> Still outstanding (to collect in future)
               </span>
               <strong style={{ color: '#B83030' }}>{TK(stats.totalOutstandingDues)}</strong>
             </div>
           )}
         </div>
-        {dueCollections.length > 0 && (
+        {pendingCollections.length > 0 && (
           <details style={{ marginTop: 12 }}>
             <summary style={{ fontSize: 12, color: 'var(--text-3)', cursor: 'pointer' }}>
-              View {dueCollections.length} due collection{dueCollections.length > 1 ? 's' : ''} today
+              View {pendingCollections.length} pending collection{pendingCollections.length > 1 ? 's' : ''} to submit
             </summary>
             <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {dueCollections.map(c => (
+              {pendingCollections.map(c => (
                 <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderBottom: '1px solid var(--border-soft)' }}>
-                  <span>{c.customer?.name || 'Unknown'} <span style={{ color: 'var(--text-3)' }}>(Sale #{c.sale_id})</span></span>
+                  <span>
+                    {c.customer?.name || 'Unknown'}
+                    <span style={{ color: 'var(--text-3)' }}> · Sale #{c.sale_id} · {c.collection_date}</span>
+                  </span>
                   <strong style={{ color: 'var(--success)' }}>{TK(c.amount)}</strong>
                 </div>
               ))}
@@ -407,6 +404,7 @@ export default function EndOfDay() {
                     onSuccess={() => setActiveAlloc(null)}
                     onCancel={() => setActiveAlloc(null)}
                     totalOutstandingDues={stats.totalOutstandingDues}
+                    pendingDues={stats.pendingDues}
                   />
                 )}
               </div>

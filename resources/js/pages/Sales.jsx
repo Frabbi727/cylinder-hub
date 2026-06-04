@@ -139,9 +139,10 @@ export default function Sales() {
   const totalReturned      = apiStats.total_returned       ?? 0;
   const totalRemaining     = apiStats.total_remaining      ?? 0;
   const totalCashCollected   = apiStats.cash_collected           ?? 0;
-  const dueCollectedToday    = apiStats.due_collected_today      ?? 0;
+  const pendingDues          = apiStats.pending_due_collections  ?? 0;
   const totalCashToHandIn    = apiStats.total_cash_to_hand_in    ?? 0;
   const todayTotalSalesAmt   = apiStats.today_total_sales_amount ?? 0;
+  const todayPaidTotal       = apiStats.today_paid_total         ?? 0;
   const todayDueAmt          = apiStats.today_due_amount         ?? 0;
 
   // All cylinders for empty return dropdown
@@ -240,8 +241,8 @@ export default function Sales() {
           <div className="dim tiny">{t('sales.cashCollectedToday')}</div>
         </div>
         <div className="scard" style={{ textAlign:'center' }}>
-          <div style={{ fontSize:16, fontWeight:700, color: dueCollectedToday > 0 ? 'var(--success)' : 'var(--text-3)' }}>{TK(dueCollectedToday)}</div>
-          <div className="dim tiny">{t('sales.dueCollectedToday', 'Dues Collected')}</div>
+          <div style={{ fontSize:16, fontWeight:700, color: pendingDues > 0 ? 'var(--success)' : 'var(--text-3)' }}>{TK(pendingDues)}</div>
+          <div className="dim tiny">{t('sales.pendingDues', 'Pending Dues')}</div>
         </div>
         <div className="scard" style={{ textAlign:'center', background:'var(--primary-soft)' }}>
           <div style={{ fontSize:16, fontWeight:800, color:'var(--primary)' }}>{TK(totalCashToHandIn)}</div>
@@ -381,7 +382,7 @@ export default function Sales() {
           <>
             <div style={{ display:'flex', gap:16, marginBottom:12, padding:'8px 14px', background:'var(--bg)', borderRadius:8, fontSize:13 }}>
               <span className="dim">{t('common.total')}: <strong>{TK(todayTotalSalesAmt)}</strong></span>
-              <span style={{ color:'var(--success)' }}>{t('common.paid')}: <strong>{TK(totalCashCollected)}</strong></span>
+              <span style={{ color:'var(--success)' }}>{t('common.paid')}: <strong>{TK(todayPaidTotal)}</strong></span>
               <span style={{ color:'var(--accent)' }}>{t('common.due')}: <strong>{TK(todayDueAmt)}</strong></span>
             </div>
             {todaySales.map(s => <SaleCard key={s.id} sale={s} onPay={openPay} t={t} onView={() => navigate(`/sales/${s.id}`)} />)}

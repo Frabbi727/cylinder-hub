@@ -84,15 +84,33 @@ class SalesmanController extends Controller
             })->with('cylinder')->orderBy('allocation_date', 'desc');
         }]);
 
-        $todaySales          = $this->saleRepository->salesmanSales($user->id, today()->toDateString());
-        $allocations         = $user->allocations;
-        $dueCollectedToday   = (float) DueCollection::where('collected_by', $user->id)
-            ->whereDate('collection_date', today())
+        $todaySales  = $this->saleRepository->salesmanSales($user->id, today()->toDateString());
+        $allocations = $user->allocations;
+
+        // Raw totals from today's sales
+        $todaySalesPaidTotal = (float) collect($todaySales)->sum('paid_amount');
+        $todayTotalSales     = (float) collect($todaySales)->sum('total_amount');
+        $todayDueAmount      = max(0.0, $todayTotalSales - $todaySalesPaidTotal);
+
+        // Subtract all due collections ever made ON today's sales to get the
+        // cash that was collected at sale time only (prevents double-counting).
+        $todaySaleIds = collect($todaySales)->pluck('id')->filter()->values()->toArray();
+        $dueCollectedOnTodaySales = empty($todaySaleIds) ? 0.0
+            : (float) DueCollection::whereIn('sale_id', $todaySaleIds)->sum('amount');
+        $salesCashToday = max(0.0, $todaySalesPaidTotal - $dueCollectedOnTodaySales);
+
+        // Pending due collections = all collected but not yet swept into any EOD cycle.
+        // These will be included in the next reconciliation automatically.
+        $pendingDueCollections = (float) DueCollection::where('collected_by', $user->id)
+            ->pending()
             ->sum('amount');
 
-        $salesCashToday       = (float) collect($todaySales)->sum('paid_amount');
-        $todayTotalSales      = (float) collect($todaySales)->sum('total_amount');
-        $todayDueAmount       = (float) $todayTotalSales - $salesCashToday;
+        $pendingCollectionsList = DueCollection::where('collected_by', $user->id)
+            ->pending()
+            ->with(['customer:id,name,phone', 'sale:id,sale_date,total_amount'])
+            ->orderByDesc('collection_date')
+            ->get();
+
         $totalOutstandingDues = (float) Sale::forSalesman($user->id)
             ->whereRaw('total_amount > paid_amount')
             ->sum(\DB::raw('total_amount - paid_amount'));
@@ -102,18 +120,20 @@ class SalesmanController extends Controller
             'total_sold'               => $allocations->sum('sold_qty'),
             'total_returned'           => $allocations->sum('returned_qty'),
             'total_remaining'          => $allocations->sum('with_salesman'),
-            'cash_collected'           => $salesCashToday,
+            'cash_collected'           => $salesCashToday,        // cylinder sales cash only
             'today_total_sales_amount' => $todayTotalSales,
-            'today_due_amount'         => $todayDueAmount,
-            'due_collected_today'      => $dueCollectedToday,
-            'total_cash_to_hand_in'    => $salesCashToday + $dueCollectedToday,
+            'today_paid_total'         => $todaySalesPaidTotal,   // for summary row "Paid" column
+            'today_due_amount'         => $todayDueAmount,        // currently still outstanding
+            'pending_due_collections'  => $pendingDueCollections, // unsubmitted due collections
+            'total_cash_to_hand_in'    => $salesCashToday + $pendingDueCollections,
             'total_outstanding_dues'   => $totalOutstandingDues,
         ];
 
         return $this->success([
-            'salesman'    => $user,
-            'today_sales' => $todaySales,
-            'stats'       => $stats,
+            'salesman'            => $user,
+            'today_sales'         => $todaySales,
+            'stats'               => $stats,
+            'pending_collections' => $pendingCollectionsList,
         ]);
     }
 

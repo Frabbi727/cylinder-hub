@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\CylinderStock;
+use App\Models\DueCollection;
 use App\Models\StockAllocation;
 use Illuminate\Support\Facades\DB;
 
@@ -138,6 +139,13 @@ class AllocationService
                 'collected_amount' => $collectedAmount,
                 'is_reconciled'    => true,
             ]);
+
+            // Sweep all pending due collections by this salesman into this EOD cycle.
+            // Any DueCollection with reconciled_allocation_id = null was collected
+            // since the previous EOD and is now being submitted with this reconciliation.
+            DueCollection::where('collected_by', $allocation->salesman_id)
+                ->whereNull('reconciled_allocation_id')
+                ->update(['reconciled_allocation_id' => $allocation->id]);
 
             $this->audit->log(
                 'reconciled', 'Allocation', $allocation->id, auth()->id(),

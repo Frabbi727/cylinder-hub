@@ -4,7 +4,6 @@ export const salesmanService = {
   getById:              (id)            => api.get(`/salesmen/${id}`).then(r => r.data),
   getReport:            (id, from, to)  => api.get(`/salesmen/${id}/report`, { params: { from, to } }).then(r => r.data),
   getCylinderFlow:      (id, from, to)  => api.get(`/salesmen/${id}/cylinder-flow`, { params: { from, to } }).then(r => r.data),
-  getDailyCollections:  (id, date)      => api.get(`/salesmen/${id}/daily-collections`, { params: date ? { date } : {} }).then(r => r.data),
   create:               (data)          => api.post('/salesmen', data).then(r => r.data),
   update:               (id, data)      => api.put(`/salesmen/${id}`, data).then(r => r.data),
   toggleActive:         (id)            => api.post(`/salesmen/${id}/toggle-active`).then(r => r.data),
