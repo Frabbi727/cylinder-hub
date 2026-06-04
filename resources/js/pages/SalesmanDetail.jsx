@@ -62,6 +62,10 @@ export default function SalesmanDetail() {
   const [editAllocForm,   setEditAllocForm]   = useState({ sold_qty: '', collected_amount: '' });
   const [editAllocError,  setEditAllocError]  = useState('');
 
+  const [editPreAllocTarget, setEditPreAllocTarget] = useState(null);
+  const [editPreAllocForm,   setEditPreAllocForm]   = useState({ qty: '', sale_price: '' });
+  const [editPreAllocError,  setEditPreAllocError]  = useState('');
+
   const activePeriod = PERIODS.find(p => p.key === period);
   const from = period === 'custom' ? customFrom : activePeriod?.from;
   const to   = period === 'custom' ? customTo   : activePeriod?.to;
@@ -88,8 +92,10 @@ export default function SalesmanDetail() {
     mutationFn: (data) => salesmanService.allocate(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['salesman-live', id] });
+      qc.invalidateQueries({ queryKey: ['salesman-report-detail'] }); // prefix match — all periods
       qc.invalidateQueries({ queryKey: ['salesmen'] });
       qc.invalidateQueries({ queryKey: ['stock'] });
+      qc.invalidateQueries({ queryKey: ['cylinders'] });
       setShowAllocate(false);
       setAllocForm({ cylinder_id: '', qty: 1, sale_price: '' });
       setAllocError('');
@@ -106,6 +112,19 @@ export default function SalesmanDetail() {
       setPayError('');
     },
     onError: (e) => setPayError(e.response?.data?.message || 'Failed to record payment'),
+  });
+
+  const editPreAllocMutation = useMutation({
+    mutationFn: ({ allocId, data }) => salesmanService.updateAllocation(allocId, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['salesman-report-detail'] });
+      qc.invalidateQueries({ queryKey: ['salesman-live', id] });
+      qc.invalidateQueries({ queryKey: ['salesmen'] });
+      qc.invalidateQueries({ queryKey: ['cylinders'] });
+      setEditPreAllocTarget(null);
+      setEditPreAllocError('');
+    },
+    onError: (e) => setEditPreAllocError(e.response?.data?.message || 'Update failed'),
   });
 
   const editReconcileMutation = useMutation({
@@ -260,7 +279,18 @@ export default function SalesmanDetail() {
                         </button>
                       </div>
                     ) : (
-                      <span className="pill pill-amber" style={{ fontSize: 11 }}>Pending EOD</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span className="pill pill-amber" style={{ fontSize: 11 }}>Pending EOD</span>
+                        <button className="btn btn-ghost btn-sm" style={{ padding: '3px 8px' }}
+                          title="Edit allocation"
+                          onClick={() => {
+                            setEditPreAllocTarget(a);
+                            setEditPreAllocForm({ qty: String(a.qty), sale_price: String(a.sale_price) });
+                            setEditPreAllocError('');
+                          }}>
+                          <Pencil size={12} />
+                        </button>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -375,6 +405,60 @@ export default function SalesmanDetail() {
               <button type="button" className="btn btn-ghost" onClick={() => setShowAllocate(false)}>Cancel</button>
               <button type="submit" className="btn btn-primary" disabled={allocateMutation.isPending}>
                 {allocateMutation.isPending ? 'Allocating...' : 'Confirm Allocation'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Edit allocation modal (before EOD) */}
+      {editPreAllocTarget && (
+        <Modal title={`Edit Allocation — ${editPreAllocTarget.cylinder?.name} ${editPreAllocTarget.cylinder?.size}`} onClose={() => setEditPreAllocTarget(null)}>
+          {editPreAllocError && (
+            <div style={{ background: 'var(--error-bg)', color: 'var(--error)', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: 13, display: 'flex', gap: 8 }}>
+              <AlertCircle size={15} style={{ marginTop: 1 }} />{editPreAllocError}
+            </div>
+          )}
+          <div style={{ background: 'var(--primary-soft)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13 }}>
+            <div style={{ display: 'flex', gap: 20 }}>
+              <div><strong>{editPreAllocTarget.qty}</strong> <span className="dim">Current qty</span></div>
+              <div><strong style={{ color: 'var(--success)' }}>{editPreAllocTarget.sold_qty || 0}</strong> <span className="dim">Already sold (minimum)</span></div>
+              <div><strong style={{ color: 'var(--primary)' }}>{TK(editPreAllocTarget.sale_price)}</strong> <span className="dim">Current price</span></div>
+            </div>
+          </div>
+          <form onSubmit={e => {
+            e.preventDefault();
+            editPreAllocMutation.mutate({
+              allocId: editPreAllocTarget.id,
+              data: {
+                qty:        parseInt(editPreAllocForm.qty),
+                sale_price: parseFloat(editPreAllocForm.sale_price),
+              },
+            });
+          }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+              <div>
+                <label className="label">Qty *</label>
+                <input type="number" className="input" min={Math.max(1, editPreAllocTarget.sold_qty || 0)} step="1"
+                  value={editPreAllocForm.qty}
+                  onChange={e => setEditPreAllocForm(f => ({ ...f, qty: e.target.value }))} required />
+                <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>
+                  {editPreAllocTarget.sold_qty > 0
+                    ? `Min: ${editPreAllocTarget.sold_qty} (${editPreAllocTarget.sold_qty} already sold)`
+                    : 'Min: 1'}
+                </div>
+              </div>
+              <div>
+                <label className="label">Sale Price/pcs ৳ *</label>
+                <input type="number" className="input" min="0.01" step="0.01"
+                  value={editPreAllocForm.sale_price}
+                  onChange={e => setEditPreAllocForm(f => ({ ...f, sale_price: e.target.value }))} required />
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button type="button" className="btn btn-ghost" onClick={() => setEditPreAllocTarget(null)}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={editPreAllocMutation.isPending}>
+                {editPreAllocMutation.isPending ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </form>

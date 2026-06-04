@@ -60,6 +60,49 @@ class AllocationService
         });
     }
 
+    public function updateAllocation(StockAllocation $allocation, int $newQty, float $newSalePrice): StockAllocation
+    {
+        return DB::transaction(function () use ($allocation, $newQty, $newSalePrice) {
+            $qtyDiff = $newQty - $allocation->qty; // positive = need more from warehouse, negative = return some
+
+            if ($qtyDiff > 0) {
+                // Need more cylinders from warehouse
+                $stock     = CylinderStock::where('cylinder_id', $allocation->cylinder_id)->lockForUpdate()->first();
+                $available = $stock?->filled_qty ?? 0;
+                if ($qtyDiff > $available) {
+                    throw new \RuntimeException(
+                        "Insufficient stock. Only {$available} filled cylinder(s) available."
+                    );
+                }
+                $this->stockService->removeFilledStock($allocation->cylinder_id, $qtyDiff);
+                $this->movements->record(
+                    $allocation->cylinder_id, 'allocation', -$qtyDiff,
+                    auth()->id(), $allocation->id,
+                    "Allocation #{$allocation->id} qty increased {$allocation->qty}→{$newQty}"
+                );
+            } elseif ($qtyDiff < 0) {
+                // Return excess cylinders to warehouse
+                $returnQty = abs($qtyDiff);
+                $this->stockService->addFilledStock($allocation->cylinder_id, $returnQty);
+                $this->movements->record(
+                    $allocation->cylinder_id, 'allocation_edit', $returnQty,
+                    auth()->id(), $allocation->id,
+                    "Allocation #{$allocation->id} qty reduced {$allocation->qty}→{$newQty}, {$returnQty} returned to stock"
+                );
+            }
+
+            $this->audit->log(
+                'updated', 'Allocation', $allocation->id, auth()->id(),
+                "Admin edited allocation #{$allocation->id} — qty {$allocation->qty}→{$newQty}, price ৳{$allocation->sale_price}→{$newSalePrice}",
+                null, null
+            );
+
+            $allocation->update(['qty' => $newQty, 'sale_price' => $newSalePrice]);
+
+            return $allocation->fresh(['salesman', 'cylinder']);
+        });
+    }
+
     public function updateReconciliation(
         StockAllocation $allocation,
         int $newSoldQty,

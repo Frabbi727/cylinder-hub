@@ -151,6 +151,31 @@ class SalesmanController extends Controller
         return $this->created($allocation->load('cylinder'), 'Allocation created.');
     }
 
+    public function updateAllocation(Request $request, StockAllocation $allocation): JsonResponse
+    {
+        if ($allocation->is_reconciled) {
+            abort(422, 'Cannot edit a reconciled allocation.');
+        }
+
+        $data = $request->validate([
+            'qty'        => 'required|integer|min:1',
+            'sale_price' => 'required|numeric|min:0',
+        ]);
+
+        // qty cannot be less than what's already been sold
+        if ($data['qty'] < $allocation->sold_qty) {
+            abort(422, "Qty cannot be less than already sold ({$allocation->sold_qty}).");
+        }
+
+        $allocation = $this->allocationService->updateAllocation(
+            $allocation,
+            $data['qty'],
+            (float) $data['sale_price']
+        );
+
+        return $this->success($allocation, 'Allocation updated.');
+    }
+
     public function updateReconcile(Request $request, StockAllocation $allocation): JsonResponse
     {
         if (!$allocation->is_reconciled) {
