@@ -46,7 +46,7 @@ export default function SalesmanDetail() {
   const navigate = useNavigate();
   const qc       = useQueryClient();
 
-  const [period,     setPeriod]     = useState('month');
+  const [period,     setPeriod]     = useState('today');
   const [customFrom, setCustomFrom] = useState(monthStart);
   const [customTo,   setCustomTo]   = useState(todayStr);
 
