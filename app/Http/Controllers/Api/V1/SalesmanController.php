@@ -144,23 +144,42 @@ class SalesmanController extends Controller
 
         // Attach cash_collected_actual, due_from_sales, and customer_dues to every
         // allocation — all computed server-side, no frontend arithmetic needed.
-        // Pool-based attribution: process allocations oldest-first so each claims
-        // its proportional share of the cylinder cash pool before newer ones take the rest.
-        // This correctly separates cash when two allocations share the same cylinder type,
-        // and works for both existing data (collected_amount=0) and new data.
-        $cylinderPool = $cylinderCashMap; // keyed by cylinder_id, seeded from today's paid_amounts
+        // Pool-based attribution: process allocations oldest-first.
+        // Reconciled allocations drain by their actual collected_amount (not expected revenue)
+        // so any unpaid dues don't over-consume the pool and starve newer allocations.
+        // Previous-day allocations don't touch today's pool (their sales aren't in it).
+        $cylinderPool = $cylinderCashMap;
+        $todayStr     = today()->toDateString();
 
         $allocations->sortBy(fn ($a) => $a->allocation_date . '_' . $a->created_at)
-            ->each(function ($alloc) use (&$cylinderPool, $cylinderDuesMap) {
+            ->each(function ($alloc) use (&$cylinderPool, $cylinderDuesMap, $todayStr) {
                 $expected = round((float) $alloc->sold_qty * (float) $alloc->sale_price, 2);
                 $pool     = round($cylinderPool[$alloc->cylinder_id] ?? 0.0, 2);
-                $actual   = min($pool, $expected);
+                $isToday  = $alloc->allocation_date === $todayStr;
+
+                if ($alloc->is_reconciled) {
+                    // Finalized: use the reconciled collected_amount for display.
+                    // Only drain today's pool if this allocation was today — previous-day
+                    // allocations' sales are not included in today's cylinderCashMap.
+                    $actual = round((float) $alloc->collected_amount, 2);
+                    $drain  = $isToday ? $actual : 0.0;
+                } elseif ($isToday) {
+                    // Today's unreconciled: prefer per-allocation tracking if set (new sales),
+                    // otherwise consume from what's left in the pool.
+                    $fromAlloc = round((float) $alloc->collected_amount, 2);
+                    $actual    = $fromAlloc > 0 ? $fromAlloc : min($pool, $expected);
+                    $drain     = $actual;
+                } else {
+                    // Previous-day unreconciled: sales not in today's pool.
+                    $actual = round((float) $alloc->collected_amount, 2);
+                    $drain  = 0.0;
+                }
 
                 $alloc->cash_collected_actual = $actual;
                 $alloc->due_from_sales        = max(0.0, round($expected - $actual, 2));
                 $alloc->customer_dues         = $cylinderDuesMap[$alloc->cylinder_id] ?? [];
 
-                $cylinderPool[$alloc->cylinder_id] = max(0.0, $pool - $actual);
+                $cylinderPool[$alloc->cylinder_id] = max(0.0, $pool - $drain);
             });
 
         $stats = [
