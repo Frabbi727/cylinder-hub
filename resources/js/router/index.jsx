@@ -1,7 +1,9 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import Login from '../pages/auth/Login';
+import Login              from '../pages/auth/Login';
+import PrivacyPolicy      from '../pages/PrivacyPolicy';
+import TermsAndConditions from '../pages/TermsAndConditions';
 import AppShell from '../components/layout/AppShell';
 
 // Admin pages
@@ -59,7 +61,9 @@ export default function Router() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route path="/login"          element={<Login />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/terms"          element={<TermsAndConditions />} />
 
         <Route path="/*" element={
           <ProtectedRoute>

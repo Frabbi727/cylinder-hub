@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { Flame, Eye, EyeOff } from 'lucide-react';
@@ -64,6 +64,11 @@ export default function Login() {
           </button>
         </form>
         <p className="dim tiny" style={{ textAlign:'center', marginTop:24 }}>{t('auth.defaultHint')}</p>
+        <div style={{ display:'flex', justifyContent:'center', alignItems:'center', gap:8, marginTop:20, paddingTop:20, borderTop:'1px solid var(--border)' }}>
+          <Link to="/privacy-policy" style={{ fontSize:13, color:'var(--primary)', textDecoration:'underline', fontWeight:500 }}>Privacy Policy</Link>
+          <span style={{ color:'var(--text-3)', fontSize:13 }}>·</span>
+          <Link to="/terms" style={{ fontSize:13, color:'var(--primary)', textDecoration:'underline', fontWeight:500 }}>Terms &amp; Conditions</Link>
+        </div>
       </div>
     </div>
   );
