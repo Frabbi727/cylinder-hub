@@ -1,121 +1,205 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Flame, ArrowLeft } from 'lucide-react';
+import { Flame, ArrowLeft, Mail } from 'lucide-react';
 
 export default function TermsAndConditions() {
   const navigate = useNavigate();
+  const CONTACT  = 'dorstit@gmail.com';
+  const APP_NAME = 'CylinderHub Salesman';
+  const UPDATED  = 'June 6, 2026';
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px 16px' }}>
-      <div style={{ maxWidth: 720, margin: '0 auto' }}>
+    <div style={{ minHeight:'100vh', background:'var(--bg)', padding:'24px 16px' }}>
+      <div style={{ maxWidth:740, margin:'0 auto' }}>
 
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0 }}>
+        {/* Brand header */}
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:32 }}>
+          <div style={{ width:42, height:42, borderRadius:10, background:'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', flexShrink:0 }}>
             <Flame size={20} />
           </div>
           <div>
-            <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>
-              Cylinder<span style={{ color: 'var(--primary)' }}>Hub</span>
-            </h1>
-            <p className="dim" style={{ fontSize: 12, margin: 0 }}>Business Management Platform</p>
+            <div style={{ fontSize:17, fontWeight:700 }}>Cylinder<span style={{ color:'var(--primary)' }}>Hub</span></div>
+            <div className="dim" style={{ fontSize:12 }}>Salesman App</div>
           </div>
         </div>
 
-        {/* Card */}
-        <div className="card" style={{ padding: '32px 40px' }}>
-          <h2 style={{ fontSize: 22, fontWeight: 700, marginTop: 0, marginBottom: 4 }}>Terms and Conditions</h2>
-          <p className="dim" style={{ fontSize: 13, marginBottom: 28 }}>Last updated: June 6, 2026</p>
+        <div className="card" style={{ padding:'36px 40px' }}>
+
+          {/* Title */}
+          <h1 style={{ fontSize:24, fontWeight:700, margin:'0 0 6px' }}>Terms and Conditions</h1>
+          <p className="dim" style={{ fontSize:13, margin:'0 0 8px' }}>Effective date: {UPDATED}</p>
+          <p className="dim" style={{ fontSize:13, margin:'0 0 32px' }}>
+            Please read these Terms and Conditions carefully before using the{' '}
+            <strong>{APP_NAME}</strong> mobile application. By downloading, installing, or using
+            the App, you agree to be bound by these terms.
+          </p>
 
           <Section title="1. Acceptance of Terms">
-            <p>By accessing or using the CylinderHub platform ("Service"), you agree to be bound by these Terms and Conditions. If you do not agree to these terms, do not use the Service.</p>
-            <p>These terms apply to all users of the platform, including administrators and salesmen.</p>
+            <p>
+              These Terms and Conditions ("Terms") govern your use of the {APP_NAME} mobile
+              application ("App") published on the Google Play Store by CylinderHub. By
+              accessing or using the App, you confirm that you have read, understood, and agree
+              to be bound by these Terms.
+            </p>
+            <p>
+              If you do not agree to these Terms, do not download, install, or use the App.
+            </p>
           </Section>
 
-          <Section title="2. Description of Service">
-            <p>CylinderHub is a business management platform designed for LPG cylinder distribution businesses. The Service includes:</p>
+          <Section title="2. Eligibility and Account Access">
             <ul>
-              <li>Inventory and stock management for cylinder tracking.</li>
-              <li>Sales recording and customer management.</li>
-              <li>Salesman allocation and End of Day (EOD) reconciliation.</li>
-              <li>Financial reporting, due collection tracking, and profit analytics.</li>
-              <li>Purchase management and supplier tracking.</li>
+              <li>The App is intended for use by authorized salesman employees of businesses that have purchased a CylinderHub account. You must be at least 18 years old to use the App.</li>
+              <li>Accounts are created and managed by your employer's administrator. You cannot self-register.</li>
+              <li>You are responsible for keeping your login credentials (email and password) confidential. Do not share your password with anyone, including colleagues.</li>
+              <li>You must notify your employer immediately if you suspect unauthorized access to your account.</li>
+              <li>Your access to the App may be deactivated at any time by your employer or by us for violation of these Terms.</li>
             </ul>
           </Section>
 
-          <Section title="3. User Accounts and Access">
+          <Section title="3. Description of the App">
+            <p>The {APP_NAME} is a business operations tool that enables salesman employees to:</p>
             <ul>
-              <li>Accounts are created by administrators. You may not create an account without authorization from your organization's admin.</li>
-              <li>You are responsible for maintaining the confidentiality of your login credentials. Do not share your password with others.</li>
-              <li>You must immediately notify your administrator if you suspect unauthorized access to your account.</li>
-              <li>Administrators are responsible for managing user access, including deactivating accounts of former employees.</li>
+              <li>View their daily cylinder stock allocations from their employer</li>
+              <li>Record sales to customers and manage customer information</li>
+              <li>Track and collect outstanding due payments from customers</li>
+              <li>Log empty cylinder returns from customers</li>
+              <li>Submit End-of-Day (EOD) reconciliation of stock and cash</li>
+              <li>View personal sales reports and performance data</li>
             </ul>
+            <p>The App connects to your employer's CylinderHub backend server. Features are subject to the permissions configured by your employer's administrator.</p>
           </Section>
 
           <Section title="4. Acceptable Use">
-            <p>You agree to use the Service only for its intended business purposes. You must not:</p>
+            <p>You agree to use the App only for its intended business purpose. You must NOT:</p>
             <ul>
-              <li>Access another user's data without authorization.</li>
-              <li>Enter false, misleading, or fraudulent data into the system.</li>
-              <li>Attempt to reverse-engineer, hack, or circumvent any security measures.</li>
-              <li>Use the Service for any unlawful purpose or in violation of any regulations.</li>
-              <li>Interfere with or disrupt the platform's operation or servers.</li>
-              <li>Attempt to access admin features using a salesman account or vice versa.</li>
+              <li>Enter false, fabricated, or misleading data into the system (e.g. recording sales that did not occur, submitting incorrect EOD figures)</li>
+              <li>Access or attempt to access another user's data or account</li>
+              <li>Attempt to bypass, reverse-engineer, decompile, or tamper with the App or its security measures</li>
+              <li>Use the App for any unlawful purpose or in violation of any applicable law or regulation</li>
+              <li>Share your account credentials with any other person</li>
+              <li>Scrape, copy, or redistribute any data from the App without authorization</li>
+              <li>Interfere with the App's servers or infrastructure</li>
             </ul>
+            <p>
+              Violation of acceptable use policies may result in immediate account suspension and
+              may be reported to your employer.
+            </p>
           </Section>
 
-          <Section title="5. Data Accuracy and Responsibility">
+          <Section title="5. Data Accuracy and Your Responsibility">
             <ul>
-              <li>You are responsible for the accuracy of all data you enter into the platform, including sales records, payment amounts, and reconciliation figures.</li>
-              <li>EOD reconciliation submissions are considered final by you. Corrections require administrator authorization.</li>
-              <li>CylinderHub is not responsible for business decisions made based on data entered or reports generated by the platform.</li>
+              <li>You are solely responsible for the accuracy of all data you enter, including sales amounts, customer details, payment records, and EOD reconciliation figures.</li>
+              <li>EOD reconciliation submissions are treated as final. Corrections can only be made by your employer's administrator.</li>
+              <li>CylinderHub is not liable for business consequences arising from inaccurate data you enter into the App.</li>
+              <li>You acknowledge that all your activity within the App is logged and visible to your employer's administrator.</li>
             </ul>
           </Section>
 
           <Section title="6. Intellectual Property">
-            <p>All software, code, design, and content comprising the CylinderHub platform is the intellectual property of the platform owner. You are granted a limited, non-exclusive, non-transferable license to use the Service for your organization's internal business operations. You may not copy, modify, distribute, or create derivative works from the platform.</p>
-          </Section>
-
-          <Section title="7. Data Ownership">
-            <p>Your organization retains ownership of all business data you enter into the platform (sales records, customer data, inventory data, etc.). We hold this data on your behalf and do not claim any ownership over it. Upon account termination, data can be exported or deleted upon request.</p>
-          </Section>
-
-          <Section title="8. Service Availability">
-            <p>We aim to maintain high availability of the Service but do not guarantee uninterrupted access. Scheduled maintenance, updates, or unforeseen technical issues may cause temporary downtime. We are not liable for any losses arising from service interruptions.</p>
-          </Section>
-
-          <Section title="9. Limitation of Liability">
-            <p>To the maximum extent permitted by applicable law, CylinderHub and its operators shall not be liable for:</p>
+            <p>
+              The {APP_NAME} application, including its design, code, branding, and content, is the
+              intellectual property of CylinderHub. You are granted a limited, non-exclusive,
+              non-transferable, revocable licence to use the App solely for your authorized
+              business activities.
+            </p>
+            <p>You may not:</p>
             <ul>
-              <li>Any indirect, incidental, or consequential damages arising from use of the Service.</li>
-              <li>Loss of business data due to user error or unauthorized access.</li>
-              <li>Financial decisions made based on reports or data generated by the platform.</li>
-              <li>Service interruptions or downtime.</li>
+              <li>Copy, modify, or distribute the App or any part of it</li>
+              <li>Create derivative works based on the App</li>
+              <li>Remove or alter any proprietary notices or branding within the App</li>
             </ul>
-            <p>Our total liability shall not exceed the amount paid for the Service in the 12 months preceding the claim.</p>
           </Section>
 
-          <Section title="10. Termination">
-            <p>We reserve the right to suspend or terminate access to the Service if these Terms are violated. Administrators may deactivate individual user accounts at any time. Upon termination, your right to access the Service ceases immediately.</p>
+          <Section title="7. Business Data Ownership">
+            <p>
+              All business data you enter (sales records, customer data, collection records) belongs
+              to your employer's organization. CylinderHub holds this data on behalf of your employer
+              and does not claim ownership over it. Upon your account deactivation, your employer
+              retains access to historical records.
+            </p>
           </Section>
 
-          <Section title="11. Changes to Terms">
-            <p>We may update these Terms from time to time. The updated version will be reflected by the "Last updated" date above. Continued use of the Service after changes constitutes acceptance of the revised Terms.</p>
+          <Section title="8. App Updates and Availability">
+            <ul>
+              <li>We may release updates to the App through the Google Play Store. You are encouraged to keep the App up to date to ensure security and access to the latest features.</li>
+              <li>We reserve the right to modify, suspend, or discontinue the App (or any feature) at any time with or without notice.</li>
+              <li>We do not guarantee uninterrupted availability. Server maintenance, updates, or technical issues may cause temporary downtime.</li>
+            </ul>
+          </Section>
+
+          <Section title="9. Disclaimer of Warranties">
+            <p>
+              The App is provided "as is" and "as available" without any warranties of any kind,
+              either express or implied. To the fullest extent permitted by law, CylinderHub disclaims
+              all warranties including but not limited to:
+            </p>
+            <ul>
+              <li>Fitness for a particular purpose</li>
+              <li>Uninterrupted or error-free operation</li>
+              <li>Accuracy or completeness of any data or reports generated</li>
+            </ul>
+          </Section>
+
+          <Section title="10. Limitation of Liability">
+            <p>To the maximum extent permitted by applicable law, CylinderHub shall not be liable for:</p>
+            <ul>
+              <li>Any indirect, incidental, special, or consequential damages arising from your use of the App</li>
+              <li>Financial losses based on reports or data within the App</li>
+              <li>Loss of data due to device failure, user error, or unauthorized access</li>
+              <li>Any damages arising from App downtime or unavailability</li>
+            </ul>
+          </Section>
+
+          <Section title="11. Termination">
+            <p>
+              These Terms remain in effect while you use the App. Your right to use the App terminates
+              automatically if:
+            </p>
+            <ul>
+              <li>Your employer deactivates your account</li>
+              <li>You violate any of these Terms</li>
+              <li>We discontinue the App</li>
+            </ul>
+            <p>Upon termination, you must immediately stop using the App and delete it from your device.</p>
           </Section>
 
           <Section title="12. Governing Law">
-            <p>These Terms shall be governed by and construed in accordance with the laws of Bangladesh. Any disputes arising under these Terms shall be subject to the exclusive jurisdiction of the courts of Bangladesh.</p>
+            <p>
+              These Terms shall be governed by and construed in accordance with the laws of
+              Bangladesh, without regard to its conflict of law principles. Any disputes arising
+              under or in connection with these Terms shall be subject to the exclusive jurisdiction
+              of the courts of Bangladesh.
+            </p>
           </Section>
 
-          <Section title="13. Contact">
-            <p>For questions about these Terms and Conditions, please contact your organization's CylinderHub administrator or reach out through the platform's support channel.</p>
+          <Section title="13. Changes to These Terms">
+            <p>
+              We may revise these Terms from time to time. When we do, the effective date above
+              will be updated. Continued use of the App after changes constitutes acceptance of the
+              revised Terms. We encourage you to review this page periodically.
+            </p>
           </Section>
+
+          <Section title="14. Contact Us">
+            <p>
+              If you have any questions about these Terms and Conditions, or to report a violation,
+              please contact us:
+            </p>
+            <div style={{ background:'var(--bg)', borderRadius:10, padding:'16px 20px', marginTop:12, display:'flex', alignItems:'center', gap:12 }}>
+              <Mail size={18} color="var(--primary)" />
+              <a href={`mailto:${CONTACT}`} style={{ color:'var(--primary)', fontWeight:600, fontSize:15, textDecoration:'none' }}>
+                {CONTACT}
+              </a>
+            </div>
+            <p style={{ marginTop:12 }}>We aim to respond within 5 business days.</p>
+          </Section>
+
         </div>
 
-        {/* Back link */}
+        {/* Back */}
         <button
           onClick={() => navigate('/login')}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', fontSize: 14, fontWeight: 500, marginTop: 24, padding: 0 }}
+          style={{ display:'flex', alignItems:'center', gap:6, background:'none', border:'none', cursor:'pointer', color:'var(--primary)', fontSize:14, fontWeight:500, marginTop:24, padding:0 }}
         >
           <ArrowLeft size={15} />
           Back to Login
@@ -128,9 +212,9 @@ export default function TermsAndConditions() {
 
 function Section({ title, children }) {
   return (
-    <div style={{ marginBottom: 28 }}>
-      <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 10, marginTop: 0, color: 'var(--text)' }}>{title}</h3>
-      <div style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--text-2)' }}>{children}</div>
+    <div style={{ marginBottom:30 }}>
+      <h2 style={{ fontSize:15, fontWeight:700, margin:'0 0 10px', color:'var(--text)' }}>{title}</h2>
+      <div style={{ fontSize:14, lineHeight:1.75, color:'var(--text-2)' }}>{children}</div>
     </div>
   );
 }

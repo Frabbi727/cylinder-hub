@@ -62,13 +62,19 @@ export default function Login() {
           <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
             {loading ? t('auth.signingIn') : t('auth.signIn')}
           </button>
+
+          <div style={{ display:'flex', gap:8, marginTop:12 }}>
+            <Link to="/privacy-policy"
+              style={{ flex:1, display:'block', textAlign:'center', padding:'9px 0', borderRadius:8, border:'1px solid var(--border)', fontSize:13, fontWeight:500, color:'var(--text-2)', textDecoration:'none', background:'var(--bg)' }}>
+              Privacy Policy
+            </Link>
+            <Link to="/terms"
+              style={{ flex:1, display:'block', textAlign:'center', padding:'9px 0', borderRadius:8, border:'1px solid var(--border)', fontSize:13, fontWeight:500, color:'var(--text-2)', textDecoration:'none', background:'var(--bg)' }}>
+              Terms &amp; Conditions
+            </Link>
+          </div>
         </form>
         <p className="dim tiny" style={{ textAlign:'center', marginTop:24 }}>{t('auth.defaultHint')}</p>
-        <div style={{ display:'flex', justifyContent:'center', alignItems:'center', gap:8, marginTop:20, paddingTop:20, borderTop:'1px solid var(--border)' }}>
-          <Link to="/privacy-policy" style={{ fontSize:13, color:'var(--primary)', textDecoration:'underline', fontWeight:500 }}>Privacy Policy</Link>
-          <span style={{ color:'var(--text-3)', fontSize:13 }}>·</span>
-          <Link to="/terms" style={{ fontSize:13, color:'var(--primary)', textDecoration:'underline', fontWeight:500 }}>Terms &amp; Conditions</Link>
-        </div>
       </div>
     </div>
   );

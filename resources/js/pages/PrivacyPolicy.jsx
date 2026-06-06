@@ -1,111 +1,198 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Flame, ArrowLeft } from 'lucide-react';
+import { Flame, ArrowLeft, Mail } from 'lucide-react';
 
 export default function PrivacyPolicy() {
   const navigate = useNavigate();
+  const CONTACT  = 'dorstit@gmail.com';
+  const APP_NAME = 'CylinderHub Salesman';
+  const UPDATED  = 'June 6, 2026';
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px 16px' }}>
-      <div style={{ maxWidth: 720, margin: '0 auto' }}>
+    <div style={{ minHeight:'100vh', background:'var(--bg)', padding:'24px 16px' }}>
+      <div style={{ maxWidth:740, margin:'0 auto' }}>
 
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0 }}>
+        {/* Brand header */}
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:32 }}>
+          <div style={{ width:42, height:42, borderRadius:10, background:'var(--primary)', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', flexShrink:0 }}>
             <Flame size={20} />
           </div>
           <div>
-            <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>
-              Cylinder<span style={{ color: 'var(--primary)' }}>Hub</span>
-            </h1>
-            <p className="dim" style={{ fontSize: 12, margin: 0 }}>Business Management Platform</p>
+            <div style={{ fontSize:17, fontWeight:700 }}>Cylinder<span style={{ color:'var(--primary)' }}>Hub</span></div>
+            <div className="dim" style={{ fontSize:12 }}>Salesman App</div>
           </div>
         </div>
 
-        {/* Card */}
-        <div className="card" style={{ padding: '32px 40px' }}>
-          <h2 style={{ fontSize: 22, fontWeight: 700, marginTop: 0, marginBottom: 4 }}>Privacy Policy</h2>
-          <p className="dim" style={{ fontSize: 13, marginBottom: 28 }}>Last updated: June 6, 2026</p>
+        <div className="card" style={{ padding:'36px 40px' }}>
 
-          <Section title="1. Introduction">
-            <p>CylinderHub ("we", "our", or "us") operates a business management platform for LPG cylinder distribution businesses. This Privacy Policy explains how we collect, use, and protect information when you use our platform.</p>
-            <p>By accessing or using CylinderHub, you agree to the terms of this Privacy Policy.</p>
+          {/* Title */}
+          <h1 style={{ fontSize:24, fontWeight:700, margin:'0 0 6px' }}>Privacy Policy</h1>
+          <p className="dim" style={{ fontSize:13, margin:'0 0 8px' }}>Effective date: {UPDATED}</p>
+          <p className="dim" style={{ fontSize:13, margin:'0 0 32px' }}>
+            This policy applies to the <strong>{APP_NAME}</strong> mobile application ("App") available on the Google Play Store.
+          </p>
+
+          <Section title="1. Who We Are">
+            <p>
+              <strong>CylinderHub</strong> operates the {APP_NAME} mobile application, a business tool
+              designed for salesman employees of LPG cylinder distribution companies. The App is
+              provided to authorized users by their employer (the business account holder).
+            </p>
+            <p>
+              For any privacy-related questions or concerns, contact us at:{' '}
+              <a href={`mailto:${CONTACT}`} style={{ color:'var(--primary)' }}>{CONTACT}</a>
+            </p>
           </Section>
 
-          <Section title="2. Information We Collect">
-            <p>We collect information that is necessary to provide our service:</p>
+          <Section title="2. What Information We Collect">
+            <p>We collect only the information necessary to operate the App:</p>
+            <SubTitle>2.1 Account Information</SubTitle>
             <ul>
-              <li><strong>Account Information:</strong> Name, email address, phone number, and role (admin or salesman) provided at account creation.</li>
-              <li><strong>Business Data:</strong> Sales records, customer information, allocation records, payment data, and inventory data entered by users.</li>
-              <li><strong>Usage Data:</strong> Login timestamps, actions taken within the platform, and IP addresses for security purposes.</li>
-              <li><strong>Device Information:</strong> Browser type, operating system, and session data for authentication and troubleshooting.</li>
+              <li>Name, email address, and phone number (provided by your employer at account creation)</li>
+              <li>Role identifier (salesman)</li>
+              <li>Avatar initials generated from your name</li>
+            </ul>
+            <SubTitle>2.2 Business Activity Data</SubTitle>
+            <ul>
+              <li>Sales records you create (customer, items, amount, payment type)</li>
+              <li>Customer information you add (name, phone, address)</li>
+              <li>Due payment collections you record</li>
+              <li>Empty cylinder return logs</li>
+              <li>End-of-Day (EOD) reconciliation submissions</li>
+            </ul>
+            <SubTitle>2.3 Device &amp; Technical Data</SubTitle>
+            <ul>
+              <li>Authentication tokens stored securely on your device (via Android Keystore / SecureStore)</li>
+              <li>IP address and request timestamps for security audit purposes</li>
+              <li>App version and operating system version for troubleshooting</li>
+            </ul>
+            <SubTitle>2.4 What We Do NOT Collect</SubTitle>
+            <ul>
+              <li>Location / GPS data — the App does not request or use location permissions</li>
+              <li>Camera or microphone — the App does not access these</li>
+              <li>Contacts from your phone — the App does not read your device contacts</li>
+              <li>Any data from outside the App</li>
             </ul>
           </Section>
 
           <Section title="3. How We Use Your Information">
-            <p>We use collected information solely to:</p>
+            <p>Information collected is used exclusively for:</p>
             <ul>
-              <li>Provide, operate, and maintain the CylinderHub platform.</li>
-              <li>Authenticate users and maintain session security.</li>
-              <li>Generate business reports and analytics for your organization.</li>
-              <li>Send system notifications relevant to your role (e.g. unreconciled allocation reminders).</li>
-              <li>Troubleshoot technical issues and improve platform stability.</li>
-              <li>Comply with applicable legal obligations.</li>
+              <li>Authenticating you and maintaining your secure session</li>
+              <li>Displaying your daily allocations, sales, and EOD reconciliation data</li>
+              <li>Enabling your employer (admin) to track business operations</li>
+              <li>Generating sales reports and performance summaries for your account</li>
+              <li>Sending in-app notifications relevant to your role (e.g. unreconciled allocation reminders)</li>
+              <li>Troubleshooting technical issues</li>
             </ul>
+            <p>We do not use your data for advertising, profiling, or any purpose outside your employer's business operations.</p>
           </Section>
 
-          <Section title="4. Data Sharing">
-            <p>We do not sell, trade, or rent your personal information to third parties. We may share data only in the following limited circumstances:</p>
+          <Section title="4. How We Share Your Information">
+            <p>We do not sell, rent, or trade your personal information. Data is shared only in these cases:</p>
             <ul>
-              <li><strong>Within your organization:</strong> Admins can view all salesman activity and data within their account.</li>
-              <li><strong>Service providers:</strong> Trusted infrastructure providers (hosting, database) who operate under strict confidentiality agreements.</li>
-              <li><strong>Legal requirements:</strong> If required by law, court order, or government authority.</li>
+              <li>
+                <strong>With your employer:</strong> Admins of your organization can view your sales activity,
+                allocations, EOD submissions, and performance data. This is the intended purpose of the App.
+              </li>
+              <li>
+                <strong>Infrastructure providers:</strong> Our hosting and database providers store your data
+                under strict confidentiality agreements and do not have rights to use it independently.
+              </li>
+              <li>
+                <strong>Legal requirements:</strong> We may disclose data if required by law, regulation,
+                court order, or governmental authority.
+              </li>
             </ul>
           </Section>
 
           <Section title="5. Data Storage and Security">
-            <p>All data is stored on secure servers. We implement industry-standard security measures including:</p>
             <ul>
-              <li>HTTPS encryption for all data in transit.</li>
-              <li>Secure token-based authentication (short-lived access tokens + refresh tokens).</li>
-              <li>Role-based access control — salesmen can only access their own data.</li>
-              <li>Audit logs for all significant actions within the platform.</li>
+              <li>All data is transmitted over HTTPS (TLS encryption).</li>
+              <li>Authentication uses short-lived access tokens (24 hours) and long-lived refresh tokens (30 days), stored in Android's secure storage.</li>
+              <li>Access is strictly role-based — you can only view and modify your own data.</li>
+              <li>All significant actions are recorded in an audit log.</li>
+              <li>Servers are maintained with industry-standard security practices.</li>
             </ul>
-            <p>While we take reasonable precautions, no system is completely secure. You are responsible for keeping your login credentials confidential.</p>
+            <p>
+              While we implement strong security measures, no system is completely immune to threats.
+              You are responsible for keeping your login credentials confidential and logging out
+              when using shared devices.
+            </p>
           </Section>
 
           <Section title="6. Data Retention">
-            <p>We retain your business data for as long as your account is active or as required by your organization's needs. Sales records, allocation history, and audit logs are retained for a minimum of 2 years to support business reporting and compliance. You may request deletion of your account by contacting your system administrator.</p>
+            <p>
+              Your business data (sales, collections, reconciliations) is retained for as long as your
+              employer's account is active. Audit logs are retained for a minimum of 2 years for
+              compliance and dispute resolution. If your account is deactivated by your employer,
+              historical records remain in the system for business continuity purposes.
+            </p>
           </Section>
 
           <Section title="7. Your Rights">
             <p>Depending on your jurisdiction, you may have the right to:</p>
             <ul>
-              <li>Access personal information we hold about you.</li>
-              <li>Request correction of inaccurate data.</li>
-              <li>Request deletion of your account and associated data.</li>
-              <li>Object to certain processing of your data.</li>
+              <li><strong>Access</strong> — request a copy of the personal data we hold about you</li>
+              <li><strong>Correction</strong> — request correction of inaccurate personal data</li>
+              <li><strong>Deletion</strong> — request deletion of your account and personal data</li>
+              <li><strong>Portability</strong> — request your data in a machine-readable format</li>
             </ul>
-            <p>To exercise these rights, contact your organization's account administrator.</p>
+            <p>
+              To exercise any of these rights, contact us at{' '}
+              <a href={`mailto:${CONTACT}`} style={{ color:'var(--primary)' }}>{CONTACT}</a>.
+              Note that business transaction data (sales, reconciliations) may be retained by your
+              employer for legal and accounting purposes even after account deletion.
+            </p>
           </Section>
 
-          <Section title="8. Cookies and Local Storage">
-            <p>CylinderHub uses browser local storage to maintain your authentication session (access token and refresh token). These are essential for the platform to function and are cleared upon logout. We do not use tracking cookies or advertising cookies.</p>
+          <Section title="8. Children's Privacy">
+            <p>
+              The {APP_NAME} is intended for use by adult employees only. We do not knowingly collect
+              personal information from anyone under 18 years of age. If you believe a minor has
+              provided us with personal data, please contact us at{' '}
+              <a href={`mailto:${CONTACT}`} style={{ color:'var(--primary)' }}>{CONTACT}</a> and
+              we will take steps to delete the information.
+            </p>
           </Section>
 
-          <Section title="9. Changes to This Policy">
-            <p>We may update this Privacy Policy from time to time. Changes will be reflected by updating the "Last updated" date above. Continued use of the platform after changes constitutes acceptance of the revised policy.</p>
+          <Section title="9. Third-Party Services">
+            <p>
+              The App connects exclusively to the CylinderHub backend API operated by your organization.
+              We do not integrate any third-party analytics SDKs, advertising SDKs, or social login
+              providers that would independently collect your data.
+            </p>
           </Section>
 
-          <Section title="10. Contact">
-            <p>If you have any questions about this Privacy Policy, please contact your organization's CylinderHub administrator or reach out to us through the platform's support channel.</p>
+          <Section title="10. Changes to This Policy">
+            <p>
+              We may update this Privacy Policy from time to time. When we do, we will update the
+              effective date above. Continued use of the App after changes are posted constitutes
+              your acceptance of the revised policy. For significant changes, we will notify users
+              through the App or via email.
+            </p>
           </Section>
+
+          <Section title="11. Contact Us">
+            <p>
+              If you have questions, concerns, or requests regarding this Privacy Policy or your
+              personal data, please contact us:
+            </p>
+            <div style={{ background:'var(--bg)', borderRadius:10, padding:'16px 20px', marginTop:12, display:'flex', alignItems:'center', gap:12 }}>
+              <Mail size={18} color="var(--primary)" />
+              <a href={`mailto:${CONTACT}`} style={{ color:'var(--primary)', fontWeight:600, fontSize:15, textDecoration:'none' }}>
+                {CONTACT}
+              </a>
+            </div>
+            <p style={{ marginTop:12 }}>We aim to respond within 5 business days.</p>
+          </Section>
+
         </div>
 
-        {/* Back link */}
+        {/* Back */}
         <button
           onClick={() => navigate('/login')}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', fontSize: 14, fontWeight: 500, marginTop: 24, padding: 0 }}
+          style={{ display:'flex', alignItems:'center', gap:6, background:'none', border:'none', cursor:'pointer', color:'var(--primary)', fontSize:14, fontWeight:500, marginTop:24, padding:0 }}
         >
           <ArrowLeft size={15} />
           Back to Login
@@ -118,9 +205,13 @@ export default function PrivacyPolicy() {
 
 function Section({ title, children }) {
   return (
-    <div style={{ marginBottom: 28 }}>
-      <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 10, marginTop: 0, color: 'var(--text)' }}>{title}</h3>
-      <div style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--text-2)' }}>{children}</div>
+    <div style={{ marginBottom:30 }}>
+      <h2 style={{ fontSize:15, fontWeight:700, margin:'0 0 10px', color:'var(--text)' }}>{title}</h2>
+      <div style={{ fontSize:14, lineHeight:1.75, color:'var(--text-2)' }}>{children}</div>
     </div>
   );
+}
+
+function SubTitle({ children }) {
+  return <p style={{ fontWeight:600, fontSize:13, marginBottom:4, marginTop:12, color:'var(--text)' }}>{children}</p>;
 }
