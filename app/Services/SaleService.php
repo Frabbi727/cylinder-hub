@@ -65,7 +65,11 @@ class SaleService
                 $allSaleItems  = array_merge($allSaleItems, $fifoResult['breakdown']);
             }
 
-            $paidAmount  = min((float) ($data['paid_amount'] ?? $totalAmount), $totalAmount);
+            if (($data['payment_type'] ?? null) === 'due') {
+                $paidAmount = 0;
+            } else {
+                $paidAmount = min((float) ($data['paid_amount'] ?? $totalAmount), $totalAmount);
+            }
             $paymentType = $paidAmount >= $totalAmount ? 'cash' : ($paidAmount > 0 ? 'partial' : 'due');
 
             $sale = Sale::create([
