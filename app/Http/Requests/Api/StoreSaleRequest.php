@@ -22,4 +22,13 @@ class StoreSaleRequest extends FormRequest
             'items.*.unit_price'  => 'required|numeric|min:0',
         ];
     }
+
+    public function withValidator($validator)
+    {
+        $validator->after(function ($validator) {
+            if (in_array($this->payment_type, ['due', 'partial']) && is_null($this->customer_id)) {
+                $validator->errors()->add('customer_id', 'A customer is required for sales with due or partial payments.');
+            }
+        });
+    }
 }
