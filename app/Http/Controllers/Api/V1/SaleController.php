@@ -29,7 +29,7 @@ class SaleController extends Controller
             'to'           => $request->get('to'),
             'payment_type' => $request->get('payment_type'),
             'search'       => $request->get('search'),
-            'has_due'      => $request->boolean('has_due'),
+            'has_due'      => $request->has('has_due') ? $request->boolean('has_due') : null,
         ];
 
         return $this->paginated(
