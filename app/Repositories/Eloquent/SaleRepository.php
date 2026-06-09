@@ -36,8 +36,12 @@ class SaleRepository implements SaleRepositoryInterface
         if (! empty($filters['search'])) {
             $query->whereHas('customer', fn ($q) => $q->where('name', 'like', '%'.$filters['search'].'%'));
         }
-        if (! empty($filters['has_due'])) {
-            $query->whereRaw('(total_amount - paid_amount) > 0');
+        if (isset($filters['has_due'])) {
+            if ($filters['has_due'] === true) {
+                $query->whereRaw('(total_amount - paid_amount) > 0');
+            } else {
+                $query->whereRaw('(total_amount - paid_amount) <= 0');
+            }
         }
 
         return $query->paginate(20);
